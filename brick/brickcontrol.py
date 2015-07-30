@@ -13,13 +13,22 @@ import struct
 # Currently hard-coded, will eventually be read from acc.ini
 HOST = ''
 HOST_PORT = 5676
+
 BRICK_HOSTNAME = 'geobrickanta.solar.pvt'
 BRICK_PORT = 1025
+
 MOTOR3POS_CTS = -2121054
 MOTOR4POS_CTS = -1218574
-PLC_PROGRAM_SPACE = 10
 
-# Dictionary for ethernet packets to the Brick.
+RX_SELECT_LOW_Z = 200
+RX_SELECT_LOW_X = -500
+RX_SELECT_HIGH_Z = 75
+RX_SELECT_HIGH_X = 500
+
+PLC_PROGRAM_SPACE = 10
+PROG_PROGRAM_SPACE = 1
+
+# Dictionaries for ethernet packets to the Brick.
 RQ_TYPE = {'upload': '\xc0',
            'download': '\x40'}
 RQ = {'sendline': '\xb0',
@@ -178,6 +187,23 @@ class BridgeServer(daemon.Daemon):
         return command_packets, self.__make_command('download', 'getresponse',
                                             0, 0, command_packets)
 
+    """
+    Method: __brick_off
+        Description:
+            Routine to move designated motor an offset of some value in
+            physical units. This routine should only be called after a
+            BRICKCAL command has been issued. Do NOT use this method on
+            its own.
+        Arguments:
+            acc_command: list of strings sent from the ACC. List format:
+                ['BRICKMOVE', motor_number, offset] where motor_number
+                is the motor to be moved and offset is the offset
+                in physical units. For motor 1 and 4 the units are mm and
+                for motor 3 the units are degrees.
+        Returns:
+            [0]: A list of packets as strings before compression.
+            [1]: A list of TCP/Ethernet packets ready to be sent to the Brick.
+    """
     def __brick_off(self, acc_command):
         # Error check that the command given is formatted correctly.
         if len(acc_command) != 3:
@@ -196,11 +222,17 @@ class BridgeServer(daemon.Daemon):
         command_packets = []
 
         command = 'CLOSE ALL \r'
-        command += 'OPEN PLC ' + str(PLC_PROGRAM_SPACE) + '\r'
+        command += 'OPEN PROG ' + str(PROG_PROGRAM_SPACE) + '\r'
         command += 'CLEAR \r'
-        command += 'INC\r'
-        command += 'ADDRESS &' + str(motor_num) + '#' + str(motor_num) + '\r'
+        command += 'INC \r'
         command += COORDINATE[motor_num] + str(offset) + '\r'
+        command += 'CLOSE \r'
+        command_packets.append(command)
+
+        command = 'OPEN PLC ' + str(PLC_PROGRAM_SPACE) + '\r'
+        command += 'CLEAR \r'
+        command += 'ADDRESS &' + str(motor_num) + '#' + str(motor_num) + '\r'
+        command += 'CMD "B' + str(PROG_PROGRAM_SPACE) + 'R" \r'
         command += 'WHILE (M' + str(motor_num) + '40=0)\r'
         command += 'WAIT\r'
         command += 'ENDWHILE\r'
@@ -395,7 +427,7 @@ class BridgeServer(daemon.Daemon):
                 packets = self.function_map[acc_command[0]](
                     self, acc_command)
             else:
-                print acc_command[0] + 'is not a recognized command.'
+                print acc_command[0] + ' is not a recognized command.'
 
             if packets is not None:
                 for packet in packets[0]:
