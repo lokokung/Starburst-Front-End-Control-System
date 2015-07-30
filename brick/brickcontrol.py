@@ -4,10 +4,17 @@
     Email: lkkung@caltech.edu
 """
 
-import socket
 import daemon
-import sys
+import datetime
+import os
+import socket
 import struct
+import sys
+import time
+
+# Logging information.
+TIMESTAMP_FMT = '%Y-%m-%d %H:%M:%S'
+LOG_FILE = 'bridge_server.log'
 
 # Define all constants:
 # Currently hard-coded, will eventually be read from acc.ini
@@ -53,8 +60,27 @@ COORDINATE = {1: 'Z',
 
 
 class BridgeServer(daemon.Daemon):
+    # ---------------------------------------------------------------
+    # COMMON ROUTINES:
+    # ---------------------------------------------------------------
+    def __get_timestamp(self):
+        current_time = time.time()
+        timestamp = datetime.datetime.fromtimestamp(current_time)
+        timestamp = timestamp.strftime(TIMESTAMP_FMT)
+        return timestamp
+
+    def __log(self, message):
+        log_message = self.__get_timestamp() + ': ' + message + '\n'
+        f = open(LOG_FILE, "a")
+        f.write(log_message)
+        f.close()
+
+    # ---------------------------------------------------------------
+    # BRICK ROUTINES:
+    # ---------------------------------------------------------------
+    #region Method Description
     """
-    Method: __make_command
+    Method: __make_brick_command
         Description:
             Takes a command to the Brick and packages it into an
             ethernet packet recognized by the Brick system.
@@ -65,7 +91,8 @@ class BridgeServer(daemon.Daemon):
             index: index associated with the request.
             command_packets: list of strings to be packed into TCP packets.
     """
-    def __make_command(self, rq_type, rq, val, index, command_packets):
+    #endregion
+    def __make_brick_command(self, rq_type, rq, val, index, command_packets):
         packets = []
         for packet in command_packets:
             buf = RQ_TYPE[rq_type] + RQ[rq]
@@ -77,6 +104,7 @@ class BridgeServer(daemon.Daemon):
             packets.append(buf)
         return packets
 
+    #region Method Description
     """
     Method: __brick_cal
         Description:
@@ -94,10 +122,11 @@ class BridgeServer(daemon.Daemon):
             [0]: A list of packets as strings before compression.
             [1]: A list of TCP/Ethernet packets ready to be sent to the Brick.
     """
+    #endregion
     def __brick_cal(self, acc_command):
         # Error check that the command given is formatted correctly.
         if len(acc_command) != 1:
-            print 'usage: BRICKCAL'
+            self.__log('Invalid call to BRICKCAL.')
             return None
 
         # Build homing procedure and execute commands.
@@ -138,9 +167,11 @@ class BridgeServer(daemon.Daemon):
         command += 'ENABLE PLC ' + str(PLC_PROGRAM_SPACE)
         command_packets.append(command)
 
-        return command_packets, self.__make_command('download', 'getresponse',
-                                            0, 0, command_packets)
+        return command_packets, \
+               self.__make_brick_command('download', 'getresponse',
+                                         0, 0, command_packets)
 
+    #region Method Description
     """
     Method: __brick_move
         Description:
@@ -158,10 +189,11 @@ class BridgeServer(daemon.Daemon):
             [0]: A list of packets as strings before compression.
             [1]: A list of TCP/Ethernet packets ready to be sent to the Brick.
     """
+    #endregion
     def __brick_move(self, acc_command):
         # Error check that the command given is formatted correctly.
         if len(acc_command) != 3:
-            print 'usage: BRICKMOVE motor_num position'
+            self.__log('Invalid call to BRICKMOVE.')
             return None
         motor_num = None
         position = None
@@ -169,7 +201,10 @@ class BridgeServer(daemon.Daemon):
             motor_num = int(acc_command[1])
             position = float(acc_command[2])
         except ValueError:
-            print 'usage: BRICKMOVE motor_num position'
+            self.__log('Invalid call to BRICKMOVE.')
+            return None
+        if motor_num not in COORDINATE.keys():
+            self.__log('Invalid call to BRICKMOVE.')
             return None
 
         # Build command based on parameters. (This assumes that the
@@ -184,9 +219,11 @@ class BridgeServer(daemon.Daemon):
         command += str(position)
         command_packets.append(command)
 
-        return command_packets, self.__make_command('download', 'getresponse',
-                                            0, 0, command_packets)
+        return command_packets, \
+               self.__make_brick_command('download', 'getresponse',
+                                         0, 0, command_packets)
 
+    #region Method Description
     """
     Method: __brick_off
         Description:
@@ -204,10 +241,11 @@ class BridgeServer(daemon.Daemon):
             [0]: A list of packets as strings before compression.
             [1]: A list of TCP/Ethernet packets ready to be sent to the Brick.
     """
+    #endregion
     def __brick_off(self, acc_command):
         # Error check that the command given is formatted correctly.
         if len(acc_command) != 3:
-            print 'usage: BRICKOFF motor_num offset'
+            self.__log('Invalid call to BRICKOFF.')
             return None
         motor_num = None
         offset = None
@@ -215,7 +253,10 @@ class BridgeServer(daemon.Daemon):
             motor_num = int(acc_command[1])
             offset = float(acc_command[2])
         except ValueError:
-            print 'usage: BRICKOFF motor_num offset'
+            self.__log('Invalid call to BRICKOFF.')
+            return None
+        if motor_num not in COORDINATE.keys():
+            self.__log('Invalid call to BRICKOFF.')
             return None
 
         # Build offset procedure into a program and execute.
@@ -243,9 +284,11 @@ class BridgeServer(daemon.Daemon):
         command += 'ENABLE PLC' + str(PLC_PROGRAM_SPACE)
         command_packets.append(command)
 
-        return command_packets, self.__make_command('download', 'getresponse',
-                                            0, 0, command_packets)
+        return command_packets, \
+               self.__make_brick_command('download', 'getresponse',
+                                         0, 0, command_packets)
 
+    #region Method Description
     """
     Method: __brick_halt
         Description:
@@ -262,16 +305,20 @@ class BridgeServer(daemon.Daemon):
             [0]: A list of packets as strings before compression.
             [1]: A list of TCP/Ethernet packets ready to be sent to the Brick.
     """
+    #endregion
     def __brick_halt(self, acc_command):
         # Error check that the command given is formatted correctly.
         if len(acc_command) != 2:
-            print 'usage: BRICKHALT motor_num'
+            self.__log('Invalid call to BRICKHALT.')
             return None
         motor_num = None
         try:
             motor_num = int(acc_command[1])
         except ValueError:
-            print 'usage: BRICKHALT motor_num'
+            self.__log('Invalid call to BRICKHALT.')
+            return None
+        if motor_num not in COORDINATE.keys():
+            self.__log('Invalid call to BRICKHALT.')
             return None
 
         # Build command based on parameters.
@@ -281,9 +328,11 @@ class BridgeServer(daemon.Daemon):
         command += '#' + str(motor_num) + 'J/'
         command_packets.append(command)
 
-        return command_packets, self.__make_command('download', 'getresponse',
-                                            0, 0, command_packets)
+        return command_packets, \
+               self.__make_brick_command('download', 'getresponse',
+                                         0, 0, command_packets)
 
+    #region Method Description
     """
     Method: __brick_loc
         Description:
@@ -301,12 +350,12 @@ class BridgeServer(daemon.Daemon):
             [0]: A list of packets as strings before compression.
             [1]: A list of TCP/Ethernet packets ready to be sent to the Brick.
     """
+    #endregion
     def __brick_loc(self, acc_command):
         # Error check that the command given is formatted correctly.
         if len(acc_command) != 4:
-            print 'usage: BRICKLOC position1 position3 position4'
+            self.__log('Invalid call to BRICKLOC.')
             return None
-        motor_num = None
         position1 = None
         position3 = None
         position4 = None
@@ -315,7 +364,7 @@ class BridgeServer(daemon.Daemon):
             position3 = float(acc_command[2])
             position4 = float(acc_command[3])
         except ValueError:
-            print 'usage: BRICKLOC position1 position3 position4'
+            self.__log('Invalid call to BRICKLOC.')
             return None
 
         # Build command based on parameters. (This assumes that the
@@ -339,9 +388,11 @@ class BridgeServer(daemon.Daemon):
         command += str(position4)
         command_packets.append(command)
 
-        return command_packets, self.__make_command('download', 'getresponse',
-                                            0, 0, command_packets)
+        return command_packets, \
+               self.__make_brick_command('download', 'getresponse',
+                                         0, 0, command_packets)
 
+    #region Method Description
     """
     Method: __brick_angle
         Description:
@@ -356,17 +407,18 @@ class BridgeServer(daemon.Daemon):
             [0]: A list of packets as strings before compression.
             [1]: A list of TCP/Ethernet packets ready to be sent to the Brick.
     """
+    #endregion
     def __brick_angle(self, acc_command):
         # Error check that the command given is formatted correctly.
         if len(acc_command) != 2:
-            print 'usage: BRICKANGLE angle'
+            self.__log('Invalid call to BRICKANGLE.')
             return None
         motor_num = None
         position = None
         try:
             angle = int(acc_command[1])
         except ValueError:
-            print 'usage: BRICKANGLE angle'
+            self.__log('Invalid call to BRICKANGLE.')
             return None
 
         # Build command based on parameters.
@@ -379,7 +431,7 @@ class BridgeServer(daemon.Daemon):
         command += str(angle)
         command_packets.append(command)
 
-        return command_packets, self.__make_command('download', 'getresponse',
+        return command_packets, self.__make_brick_command('download', 'getresponse',
                                             0, 0, command_packets)
 
     # Function mapping depending on the command passed from ACC.
@@ -390,33 +442,36 @@ class BridgeServer(daemon.Daemon):
                     'BRICKLOC' : __brick_loc,
                     'BRICKANGLE': __brick_angle}
 
+    #region Method Description
     """
     Method: run
         Description:
             Daemon routine for the BridgeServer between the ACC and the Brick.
     """
+    #endregion
     def run(self):
         # Setup listener to this box at HOST_PORT.
         acc_listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        print 'Setup listener.'
+        self.__log('Attempt to set up listener...')
         try:
             acc_listener.bind((HOST, HOST_PORT))
         except socket.error, msg:
-            print ('Unable to listen at port ' + str(HOST_PORT) +
-                   '. Error Code: ' + str(msg[0]) + '. Message: ' +
-                   str(msg[1]))
+            self.__log('Unable to listen at port ' + str(HOST_PORT) +
+                       '. Error Code: ' + str(msg[0]) + '. Message: ' +
+                       str(msg[1]))
             sys.exit()
         acc_listener.listen(1)
-        print ('Successfully setup listener..\n')
+        self.__log('Successfully setup listener')
 
         while True:
             # Wait for a connection from ACC.
             connection, address = acc_listener.accept()
-            print ('Connection from ' + address[0] +
-                   ':' + str(address[1]) + '\n')
+            self.__log('Connection from ' + address[0] +
+                       ':' + str(address[1]))
 
             # Read packet sent from ACC, currently capped at 1024 bytes.
             acc_command = connection.recv(1024).split()
+            self.__log('Command issued from connection: ' + acc_command)
 
             # Echo command issued back to ACC.
             connection.sendall(acc_command[0])
@@ -427,12 +482,13 @@ class BridgeServer(daemon.Daemon):
                 packets = self.function_map[acc_command[0]](
                     self, acc_command)
             else:
-                print acc_command[0] + ' is not a recognized command.'
+                self.__log('Unrecognized command received: ' +
+                           acc_command[0] + '.')
 
             if packets is not None:
+                self.__log('Issued the following commands to brick:')
                 for packet in packets[0]:
-                    print 'Issued the following commands to brick: \n' + \
-                           repr(packet) + '\n'
+                    self.__log(repr(packet))
 
                 brick_socket = socket.socket(socket.AF_INET,
                                              socket.SOCK_STREAM)
@@ -447,11 +503,11 @@ class BridgeServer(daemon.Daemon):
                         brick_socket.sendall(packet)
                         brick_socket.settimeout(1.5)
                         reply = brick_socket.recv(1024)
-                        print (reply + '\n')
+                        self.__log('Reply from brick: ' + reply)
                 except socket.gaierror:
-                    print 'Brick hostname could not be resolved.'
+                    self.__log('Brick hostname could not be resolved.')
                 except socket.error:
-                    print 'Unable to send packet to brick.'
+                    self.__log('Unable to send packet to brick.')
                 brick_socket.close()
 
 """
