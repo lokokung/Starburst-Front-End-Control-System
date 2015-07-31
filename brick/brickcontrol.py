@@ -74,6 +74,7 @@ class BridgeServer(daemon.Daemon):
         f = open(LOG_FILE, "a")
         f.write(log_message)
         f.close()
+        print log_message
 
     # ---------------------------------------------------------------
     # BRICK ROUTINES:
@@ -135,6 +136,9 @@ class BridgeServer(daemon.Daemon):
         command = 'CLOSE ALL \r'
         command += 'OPEN PLC ' + str(PLC_PROGRAM_SPACE) + '\r'
         command += 'CLEAR \r'
+        command += 'CMD "#1J/" \r'
+        command += 'CMD "#3J/" \r'
+        command += 'CMD "#4J/" \r'
         command += 'CMD "#3J+" \r'
         command += 'CMD "#4J+" \r'
         command += 'WHILE (M331=0 OR M431=0)\r'
@@ -212,6 +216,9 @@ class BridgeServer(daemon.Daemon):
         command_packets = []
 
         command = 'CLOSE ALL'
+        command += 'CMD "#1J/" \r'
+        command += 'CMD "#3J/" \r'
+        command += 'CMD "#4J/" \r'
         command += '&'
         command += str(motor_num)
         command += '!'
@@ -263,6 +270,9 @@ class BridgeServer(daemon.Daemon):
         command_packets = []
 
         command = 'CLOSE ALL \r'
+        command += '#1J/ \r'
+        command += '#3J/ \r'
+        command += '#4J/ \r'
         command += 'OPEN PROG ' + str(PROG_PROGRAM_SPACE) + '\r'
         command += 'CLEAR \r'
         command += 'INC \r'
@@ -371,7 +381,8 @@ class BridgeServer(daemon.Daemon):
         # position given is in physical units.)
         command_packets = []
 
-        command = '&'
+        command = '#1J/ \r #3J/ \r #4J/'
+        command += '&'
         command += str(1)
         command += '!'
         command += COORDINATE[1]
@@ -424,7 +435,8 @@ class BridgeServer(daemon.Daemon):
         # Build command based on parameters.
         command_packets = []
 
-        command = '&'
+        command = '#3J/ \r'
+        command += '&'
         command += str(3)
         command += '!'
         command += COORDINATE[3]
@@ -434,13 +446,51 @@ class BridgeServer(daemon.Daemon):
         return command_packets, self.__make_brick_command('download', 'getresponse',
                                             0, 0, command_packets)
 
+    #region Method Description
+    """
+    Method: __brick_reset
+        Description:
+            Routine to reset the Brick cleanly. Do NOT use this method on its
+            own.
+        Arguments:
+            acc_command: list of strings sent from the ACC. List format:
+                ['BRICKRESET'].
+        Returns:
+            [0]: A list of packets as strings before compression.
+            [1]: A list of TCP/Ethernet packets ready to be sent to the Brick.
+    """
+    #endregion
+    def __brick_reset(self, acc_command):
+        # Error check that the command given is formatted correctly.
+        if len(acc_command) != 1:
+            self.__log('Invalid call to BRICKRESET.')
+            return None
+
+        # Build homing procedure and execute commands.
+        command_packets = []
+
+        command = 'CLOSE ALL \r'
+        command += 'OPEN PROG ' + str(PROG_PROGRAM_SPACE) + '\r'
+        command += 'CLEAR \r'
+        command += 'M6014=0 \r'
+        command += 'DWELL2000 \r'
+        command += 'CMD"$$$" \r'
+        command += 'CLOSE \r'
+        command += 'B' + str(PROG_PROGRAM_SPACE) + 'R'
+        command_packets.append(command)
+
+        return command_packets, \
+               self.__make_brick_command('download', 'getresponse',
+                                         0, 0, command_packets)
+
     # Function mapping depending on the command passed from ACC.
     function_map = {'BRICKCAL': __brick_cal,
                     'BRICKMOVE': __brick_move,
                     'BRICKOFF': __brick_off,
                     'BRICKHALT': __brick_halt,
                     'BRICKLOC' : __brick_loc,
-                    'BRICKANGLE': __brick_angle}
+                    'BRICKANGLE': __brick_angle,
+                    'BRICKRESET': __brick_reset}
 
     #region Method Description
     """
@@ -470,8 +520,9 @@ class BridgeServer(daemon.Daemon):
                        ':' + str(address[1]))
 
             # Read packet sent from ACC, currently capped at 1024 bytes.
-            acc_command = connection.recv(1024).split()
+            acc_command = connection.recv(1024)
             self.__log('Command issued from connection: ' + acc_command)
+            acc_command = acc_command.split()
 
             # Echo command issued back to ACC.
             connection.sendall(acc_command[0])
