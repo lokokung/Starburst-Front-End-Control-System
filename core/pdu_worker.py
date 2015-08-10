@@ -24,6 +24,7 @@ class PDUWorker(i_worker.IWorker):
                          'ND-ON',
                          'ND-OFF']
         self.browser = None
+        self.name = 'PDU-Worker'
 
     # ---------------------------------------------------------------
     # LOGIN ROUTINES SPECIFIC TO PDU

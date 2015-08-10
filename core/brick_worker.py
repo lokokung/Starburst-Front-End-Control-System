@@ -56,6 +56,7 @@ class BrickWorker(i_worker.IWorker):
                          'BRICKRESET']
         self.brick_socket = None
         self.brick_ip = socket.gethostbyname(BRICK_HOSTNAME)
+        self.name = 'GeoBrick-Worker'
 
     # ---------------------------------------------------------------
     # COMMAND PACKAGING ROUTINES SPECIFIC TO GEOBRICK

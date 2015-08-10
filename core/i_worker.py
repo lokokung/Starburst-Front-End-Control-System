@@ -19,6 +19,7 @@ Class: IWorker
 class IWorker(object):
     def __init__(self):
         self.logger = self.__print
+        self.name = None
 
     # region Method Description
     """
@@ -75,3 +76,5 @@ class IWorker(object):
     # endregion
     def execute(self, acc_command):
         raise NotImplementedError
+
+

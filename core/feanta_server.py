@@ -55,6 +55,10 @@ class ServerDaemon(daemon.Daemon):
         f.close()
         print log_message
 
+    # ---------------------------------------------------------------
+    # CORE ROUTINES
+    # ---------------------------------------------------------------
+
     # region Method Description
     """
     Method: link_worker
@@ -71,6 +75,27 @@ class ServerDaemon(daemon.Daemon):
         for command in worker.get_command_list():
             self.function_map[command] = worker
         worker.set_logger(self.__log)
+
+    # region Method Description
+    """
+    Method: list_workers
+        Description:
+            Lists each worker linked to this ServerDaemon.
+    """
+    # endregion
+    def list_workers(self):
+        for worker in self.workers:
+            print worker.name
+
+    # region Method Description
+    """
+    Method: list_commands
+        Description:
+            Lists every command that this server can respond to.
+    """
+    # endregion
+    def list_commands(self):
+        print self.function_map.keys()
 
     # region Method Description
     """
