@@ -19,9 +19,21 @@ LOG_FILE = 'bridge_server.log'
 HOST = ''
 HOST_PORT = 5676
 
-
+# region Class Description
+"""
+Class: ServerDaemon
+    Description:
+        Implementation of a daemon server that is intended to run on
+        the feanta box in order to process commands from the ACC and
+        direct and execute the commands to the sub-units connected to
+        the feanta computer.
+    Arguments:
+        pidfile: string designating the .pid file to save the pid for
+            this daemon process to allow for the process to be stopped
+            by the stop function or to be stopped manually in Linux.
+"""
+# endregion
 class ServerDaemon(daemon.Daemon):
-
     def __init__(self, pidfile):
         super(ServerDaemon, self).__init__(pidfile)
         self.workers = []
