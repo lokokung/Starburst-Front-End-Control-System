@@ -20,7 +20,9 @@ ON_OFF_MAP = {0: 'OFF',
 class PDUWorker(i_worker.IWorker):
     def __init__(self):
         super(PDUWorker, self).__init__()
-        self.commands = ['OUTLET', 'ND-ON', 'ND-OFF']
+        self.commands = ['OUTLET',
+                         'ND-ON',
+                         'ND-OFF']
         self.browser = None
 
     # ---------------------------------------------------------------
@@ -160,7 +162,7 @@ class PDUWorker(i_worker.IWorker):
 
     # ---------------------------------------------------------------
     # INTERFACE IMPLEMENTATIONS
-    * ---------------------------------------------------------------
+    # ---------------------------------------------------------------
 
     # region Method Description
     """
@@ -187,6 +189,7 @@ class PDUWorker(i_worker.IWorker):
             self.logger('Unable to login to PDU.')
             return None
 
+        # Use the routine calls to generate url commands.
         command_string = self.function_map[acc_command[0]](self, acc_command)
         if command_string is not None:
             self.browser.open(command_string)
