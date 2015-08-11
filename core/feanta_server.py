@@ -38,6 +38,7 @@ class ServerDaemon(daemon.Daemon):
         super(ServerDaemon, self).__init__(pidfile)
         self.workers = []
         self.function_map = {}
+        self.log_file = LOG_FILE
 
     # ---------------------------------------------------------------
     # BASIC ROUTINES:
@@ -50,7 +51,7 @@ class ServerDaemon(daemon.Daemon):
 
     def __log(self, message):
         log_message = self.__get_timestamp() + ': ' + message + '\n'
-        f = open(LOG_FILE, "a")
+        f = open(self.log_file, "a")
         f.write(log_message)
         f.close()
         print log_message
@@ -84,8 +85,21 @@ class ServerDaemon(daemon.Daemon):
     """
     # endregion
     def list_workers(self):
+        workers_list = ''
         for worker in self.workers:
-            print worker.name
+            workers_list += worker.name + '\n'
+        return workers_list
+
+    # region Method Description
+    """
+    Method: set_log_file
+        Description:
+            Sets the destination path for the log file. Defaulted to
+            LOG_FILE.
+    """
+    # endregion
+    def set_log_file(self, log_file_destination):
+        self.log_file = log_file_destination
 
     # region Method Description
     """
@@ -95,7 +109,7 @@ class ServerDaemon(daemon.Daemon):
     """
     # endregion
     def list_commands(self):
-        print self.function_map.keys()
+        return self.function_map.keys()
 
     # region Method Description
     """
