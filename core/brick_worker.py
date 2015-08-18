@@ -158,6 +158,9 @@ class BrickWorker(i_worker.IWorker):
         command += 'ENABLE PLC ' + str(PLC_PROGRAM_SPACE)
         command_packets.append(command)
 
+        command = 'CLOSE ALL'
+        command_packets.append(command)
+
         return command_packets, \
                self.__make_brick_command('download', 'getresponse',
                                          0, 0, command_packets)
@@ -202,15 +205,18 @@ class BrickWorker(i_worker.IWorker):
         # position given is in physical units.)
         command_packets = []
 
-        command = 'CLOSE ALL'
-        command += 'CMD "#1J/" \r'
-        command += 'CMD "#3J/" \r'
-        command += 'CMD "#4J/" \r'
+        command = 'CLOSE ALL \r'
+        command += '#1J/ \r'
+        command += '#3J/ \r'
+        command += '#4J/ \r'
         command += '&'
         command += str(motor_num)
         command += '!'
         command += COORDINATE[motor_num]
         command += str(position)
+        command_packets.append(command)
+
+        command = 'CLOSE ALL'
         command_packets.append(command)
 
         return command_packets, \
@@ -269,7 +275,7 @@ class BrickWorker(i_worker.IWorker):
 
         command = 'OPEN PLC ' + str(PLC_PROGRAM_SPACE) + '\r'
         command += 'CLEAR \r'
-        command += 'ADDRESS &' + str(motor_num) + '#' + str(motor_num) + '\r'
+        command += 'ADDRESS &' + str(motor_num) + '#' + str(motor_num)
         command += 'CMD "B' + str(PROG_PROGRAM_SPACE) + 'R" \r'
         command += 'WHILE (M' + str(motor_num) + '40=0)\r'
         command += 'WAIT\r'
@@ -277,7 +283,7 @@ class BrickWorker(i_worker.IWorker):
         command_packets.append(command)
 
         command = 'CMD "DISABLE PLC ' + str(PLC_PROGRAM_SPACE) + '" \r'
-        command += 'CLOSE \r'
+        command += 'CLOSE ALL'
         command += 'ENABLE PLC' + str(PLC_PROGRAM_SPACE)
         command_packets.append(command)
 
@@ -321,8 +327,12 @@ class BrickWorker(i_worker.IWorker):
         # Build command based on parameters.
         command_packets = []
 
-        command = '#' + str(motor_num) + 'K \r'
+        command = 'CLOSE ALL \r'
+        command += '#' + str(motor_num) + 'K \r'
         command += '#' + str(motor_num) + 'J/'
+        command_packets.append(command)
+
+        command = 'CLOSE ALL'
         command_packets.append(command)
 
         return command_packets, \
@@ -368,7 +378,8 @@ class BrickWorker(i_worker.IWorker):
         # position given is in physical units.)
         command_packets = []
 
-        command = '#1J/ \r #3J/ \r #4J/'
+        command = 'CLOSE ALL \r'
+        command += '#1J/ \r #3J/ \r #4J/'
         command += '&'
         command += str(1)
         command += '!'
@@ -384,6 +395,9 @@ class BrickWorker(i_worker.IWorker):
         command += '!'
         command += COORDINATE[4]
         command += str(position4)
+        command_packets.append(command)
+
+        command = 'CLOSE ALL'
         command_packets.append(command)
 
         return command_packets, \
@@ -422,12 +436,16 @@ class BrickWorker(i_worker.IWorker):
         # Build command based on parameters.
         command_packets = []
 
-        command = '#3J/ \r'
+        command = 'CLOSE ALL \r'
+        command += '#3J/ \r'
         command += '&'
         command += str(3)
         command += '!'
         command += COORDINATE[3]
         command += str(angle)
+        command_packets.append(command)
+
+        command = 'CLOSE ALL'
         command_packets.append(command)
 
         return command_packets, self.__make_brick_command('download', 'getresponse',
@@ -464,6 +482,9 @@ class BrickWorker(i_worker.IWorker):
         command += 'CMD"$$$" \r'
         command += 'CLOSE \r'
         command += 'B' + str(PROG_PROGRAM_SPACE) + 'R'
+        command_packets.append(command)
+
+        command = 'CLOSE ALL'
         command_packets.append(command)
 
         return command_packets, \
@@ -514,23 +535,23 @@ class BrickWorker(i_worker.IWorker):
             for packet in packets[0]:
                 self.logger(repr(packet))
 
-                self.brick_socket = socket.socket(socket.AF_INET,
-                                                  socket.SOCK_STREAM)
-                reply = None
+            # Try pushing message across TCP.
+            # Wait for reply of at most 1024 bytes.
+            try:
+                for packet in packets[1]:
+                    reply = None
+                    self.brick_socket = socket.socket(socket.AF_INET,
+                                              socket.SOCK_STREAM)
+                    self.brick_socket.connect((self.brick_ip, BRICK_PORT))
+                    self.brick_socket.sendall(packet)
+                    self.brick_socket.settimeout(1.5)
+                    reply = self.brick_socket.recv(1024)
 
-                # Try pushing message across TCP.
-                # Wait for reply of at most 1024 bytes.
-                try:
-                    brick_socket.connect((self.brick_ip, BRICK_PORT))
-                    for packet in packets[1]:
-                        brick_socket.sendall(packet)
-                        brick_socket.settimeout(1.5)
-                        reply = brick_socket.recv(1024)
-                        self.logger('Reply from brick: ' + reply)
-                except socket.gaierror:
-                    self.logger('Brick hostname could not be resolved.')
-                except socket.error:
-                    self.logger('Unable to send packet to brick.')
-                self.brick_socket.close()
-                self.brick_socket = None
+                    self.logger('Reply from brick: ' + reply)
+                    self.brick_socket.close()
+                    self.brick_socket = None
+            except socket.gaierror:
+                self.logger('Brick hostname could not be resolved.')
+            except socket.error:
+                self.logger('Unable to send packet to brick.')
 
