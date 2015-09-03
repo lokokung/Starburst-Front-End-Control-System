@@ -10,15 +10,13 @@ import struct
 import shutil
 
 # NUMBER OF ELEMENTS IN CLUSTERS:
-NELEMENTS = ['FEMA', 'FEMB']
-
-NELEMENTS_ANTENNA = 4
+NELEMENTS_ANTENNA = 5
 
 NELEMENTS_ANTENNA_POWERSTRIP = 10
 
 NELEMENTS_ANTENNA_THERMAL = 9
 
-NELEMENTS_ANTENNA_RECEIVER = 7
+NELEMENTS_ANTENNA_RECEIVER = 4
 NELEMENTS_ANTENNA_RECEIVER_LNA = 3
 
 NELEMENTS_ANTENNA_SERVO = 3
@@ -44,9 +42,15 @@ THERMAL_DEF = ['70KStageTemp',
                '70KRadiationShieldTemp',
                'LowFreqFeedhornTemp']
 
+# AXIS DEFINITIONS
+AXIS_DEF = {1: 'ZAxis',
+            3: 'RotationAxis',
+            4: 'XAxis'}
+
 # Version Number for FEM stateframe
 VERSION = 1               # Version Date: 9/1/15
 VERSION_DATE = '9.1.15'   # Most recent update (used to write backup file)
+
 
 def gen_fem_sf(sf_dict, mk_xml=False):
     # Set up file name, format string, and buffer.
@@ -60,14 +64,12 @@ def gen_fem_sf(sf_dict, mk_xml=False):
         xml = open(xmlFile, "w")
         xml.write('<Cluster>\n')
         xml.write('<Name>FEM</Name>\n')
-        xml.write('<NumElts>' + str(len(NELEMENTS))
+        xml.write('<NumElts>' + str(NELEMENTS_ANTENNA)
                   + '</NumElts>\n')
 
-    for antenna in NELEMENTS:
-        item = sf_dict.get(antenna, {})
-        append_fmt, append_buf = __antenna(item, antenna, xml, mk_xml)
-        fmt += append_fmt
-        buf += append_buf
+    append_fmt, append_buf = __antenna(sf_dict, xml, mk_xml)
+    fmt += append_fmt
+    buf += append_buf
 
     # Append for end of data cluster
     if mk_xml:
@@ -84,6 +86,7 @@ def gen_fem_sf(sf_dict, mk_xml=False):
         print 'Modify acc.ini to reflect this if this is a change in size'
 
     return fmt, buf, xmlFile
+
 
 def __powerstrip(dict, xml, mk_xml):
     fmt = ""
@@ -175,6 +178,7 @@ def __powerstrip(dict, xml, mk_xml):
         xml.write('</Cluster>\n')
     return fmt, buf
 
+
 def __thermal(dict, xml, mk_xml):
     fmt = ""
     buf = ""
@@ -242,7 +246,8 @@ def __thermal(dict, xml, mk_xml):
         xml.write('</Cluster>\n')
     return fmt, buf
 
-def __receiver_lna(dict, lna, xml, mk_xml):
+
+def __receiver_lna(mydict, xml, mk_xml):
     fmt = ""
     buf = ""
 
@@ -254,62 +259,31 @@ def __receiver_lna(dict, lna, xml, mk_xml):
     default_lna_gatevoltage = 0
 
     # ----------------------------------------------------------------------
-    # XML Cluster setup.
-    # ----------------------------------------------------------------------
-    if mk_xml:
-        xml.write('<Cluster>\n')
-        xml.write('<Name>LNA' + str(lna) + '</Name>\n')
-        xml.write('<NumElts>' + str(NELEMENTS_ANTENNA_RECEIVER_LNA)
-                  + '</NumElts>\n')
-
-    # ----------------------------------------------------------------------
     # ELEMENT 1> Drain voltage (double)
     # ----------------------------------------------------------------------
 
     # Pack a double for the temperature.
-    item = dict.get('DRAINVOLTAGE', default_lna_drainvoltage)
-    fmt += 'd'
+    item = mydict.get('DRAINVOLTAGE', default_lna_drainvoltage)
     buf += struct.pack('d', item)
-    if mk_xml:
-        xml.write('<DBL>\n')
-        xml.write('<Name>DrainVoltage</Name>\n')
-        xml.write('<Val></Val>\n')
-        xml.write('</DBL>\n')
 
     # ----------------------------------------------------------------------
     # ELEMENT 2> Drain current (double)
     # ----------------------------------------------------------------------
 
     # Pack a double for the temperature.
-    item = dict.get('DRAINCURRENT', default_lna_draincurrent)
-    fmt += 'd'
+    item = mydict.get('DRAINCURRENT', default_lna_draincurrent)
     buf += struct.pack('d', item)
-    if mk_xml:
-        xml.write('<DBL>\n')
-        xml.write('<Name>DrainCurrent</Name>\n')
-        xml.write('<Val></Val>\n')
-        xml.write('</DBL>\n')
 
     # ----------------------------------------------------------------------
     # ELEMENT 3> Gate voltage (double)
     # ----------------------------------------------------------------------
 
     # Pack a double for the temperature.
-    item = dict.get('GATEVOLTAGE', default_lna_gatevoltage)
-    fmt += 'd'
+    item = mydict.get('GATEVOLTAGE', default_lna_gatevoltage)
     buf += struct.pack('d', item)
-    if mk_xml:
-        xml.write('<DBL>\n')
-        xml.write('<Name>GateVoltage</Name>\n')
-        xml.write('<Val></Val>\n')
-        xml.write('</DBL>\n')
 
-    # ----------------------------------------------------------------------
-    # XML Cluster closure.
-    # ----------------------------------------------------------------------
-    if mk_xml:
-        xml.write('</Cluster>\n')
     return fmt, buf
+
 
 def __receiver(dict, xml, mk_xml):
     fmt = ""
@@ -319,6 +293,7 @@ def __receiver(dict, xml, mk_xml):
     # Defaults - Receiver:
     # ----------------------------------------------------------------------
     default_status = 0
+    default_lnas = [{}, {}, {}, {}]
 
     # ----------------------------------------------------------------------
     # XML Cluster setup.
@@ -372,13 +347,45 @@ def __receiver(dict, xml, mk_xml):
         xml.write('</U32>\n')
 
     # ----------------------------------------------------------------------
-    # ELEMENT 4-7> LNA Clusters (cluster of 3 doubles)
+    # ELEMENT 4> LNA Clusters (4x1 LNA Clusters)
     # ----------------------------------------------------------------------
 
+    fmt += 'I'
+    buf += struct.pack('I', 4)
+    fmt += '12d'
+    if mk_xml:
+        xml.write('<Array>\n')
+        xml.write('<Name>LNAs</Name>\n')
+        xml.write('<Dimsize>4</Dimsize>\n')
+
+        xml.write('<Cluster>\n')
+        xml.write('<Name></Name>\n')
+        xml.write('<NumElts>' + str(NELEMENTS_ANTENNA_RECEIVER_LNA)
+                  + '</NumElts>\n')
+
+        xml.write('<DBL>\n')
+        xml.write('<Name>DrainVoltage</Name>\n')
+        xml.write('<Val></Val>\n')
+        xml.write('</DBL>\n')
+
+        xml.write('<DBL>\n')
+        xml.write('<Name>DrainCurrent</Name>\n')
+        xml.write('<Val></Val>\n')
+        xml.write('</DBL>\n')
+
+        xml.write('<DBL>\n')
+        xml.write('<Name>GateVoltage</Name>\n')
+        xml.write('<Val></Val>\n')
+        xml.write('</DBL>\n')
+
+        xml.write('</Cluster>\n')
+        xml.write('</Array>\n')
+
+    item = dict.get('LNAS', default_lnas)
+
     # Call __receiver_lna on each LNA to generate clusters.
-    for i in range(0, 4):
-        item = dict.get('LNA' + str(i), {})
-        append_fmt, append_buf = __receiver_lna(item, i, xml, mk_xml)
+    for lna_cluster in item:
+        append_fmt, append_buf = __receiver_lna(lna_cluster, xml, mk_xml)
         fmt += append_fmt
         buf += append_buf
 
@@ -388,6 +395,7 @@ def __receiver(dict, xml, mk_xml):
     if mk_xml:
         xml.write('</Cluster>\n')
     return fmt, buf
+
 
 def __servo_axis(dict, axis, xml, mk_xml):
     fmt = ""
@@ -422,7 +430,7 @@ def __servo_axis(dict, axis, xml, mk_xml):
     # ----------------------------------------------------------------------
     if mk_xml:
         xml.write('<Cluster>\n')
-        xml.write('<Name>Axis' + str(axis) + '</Name>\n')
+        xml.write('<Name>' + str(axis) + '</Name>\n')
         xml.write('<NumElts>' + str(NELEMENTS_ANTENNA_SERVO_AXIS)
                   + '</NumElts>\n')
 
@@ -731,9 +739,9 @@ def __servo(dict, xml, mk_xml):
     # ----------------------------------------------------------------------
 
     # Call __receiver_lna on each LNA to generate clusters.
-    for i in range(0, 3):
-        item = dict.get('AXIS' + str(i), {})
-        append_fmt, append_buf = __servo_axis(item, i, xml, mk_xml)
+    for key, value in AXIS_DEF.items():
+        item = dict.get('AXIS' + str(key), {})
+        append_fmt, append_buf = __servo_axis(item, value, xml, mk_xml)
         fmt += append_fmt
         buf += append_buf
 
@@ -744,23 +752,21 @@ def __servo(dict, xml, mk_xml):
         xml.write('</Cluster>\n')
     return fmt, buf
 
-def __antenna(sf_dict, antenna, xml, mk_xml):
+
+def __antenna(sf_dict, xml, mk_xml):
     fmt = ""
     buf = ""
 
     # ----------------------------------------------------------------------
-    # XML Cluster setup.
+    # Defaults - Antennas
     # ----------------------------------------------------------------------
-    if mk_xml:
-        xml.write('<Cluster>\n')
-        xml.write('<Name>' + antenna + '</Name>\n')
-        xml.write('<NumElts>' + str(NELEMENTS_ANTENNA)
-                  + '</NumElts>\n')
+    default_timestamp = 0
 
+    sf_dict = sf_dict.get('FEM', {})
     # ----------------------------------------------------------------------
     # Dump PowerStrip
     # ----------------------------------------------------------------------
-    item = sf_dict.get(antenna, {}).get('POWERSTRIP', {})
+    item = sf_dict.get('POWERSTRIP', {})
     append_fmt, append_buf = __powerstrip(item, xml, mk_xml)
     fmt += append_fmt
     buf += append_buf
@@ -768,7 +774,7 @@ def __antenna(sf_dict, antenna, xml, mk_xml):
     # ----------------------------------------------------------------------
     # Dump Thermal
     # ----------------------------------------------------------------------
-    item = sf_dict.get(antenna, {}).get('THERMAL', {})
+    item = sf_dict.get('THERMAL', {})
     append_fmt, append_buf = __thermal(item, xml, mk_xml)
     fmt += append_fmt
     buf += append_buf
@@ -776,7 +782,7 @@ def __antenna(sf_dict, antenna, xml, mk_xml):
     # ----------------------------------------------------------------------
     # Dump Receiver
     # ----------------------------------------------------------------------
-    item = sf_dict.get(antenna, {}).get('RECEIVER', {})
+    item = sf_dict.get('RECEIVER', {})
     append_fmt, append_buf = __receiver(item, xml, mk_xml)
     fmt += append_fmt
     buf += append_buf
@@ -784,15 +790,22 @@ def __antenna(sf_dict, antenna, xml, mk_xml):
     # ----------------------------------------------------------------------
     # Dump Servo
     # ----------------------------------------------------------------------
-    item = sf_dict.get(antenna, {}).get('SERVO', {})
+    item = sf_dict.get('SERVO', {})
     append_fmt, append_buf = __servo(item, xml, mk_xml)
     fmt += append_fmt
     buf += append_buf
 
     # ----------------------------------------------------------------------
-    # XML Cluster closure.
+    # Dump Timestamp. Use LabVIEW format i.e. double time in seconds since
+    # 1904-01-01 00:00 UT.
     # ----------------------------------------------------------------------
+    item = sf_dict.get('TIMESTAMP', default_timestamp)
+    fmt += 'd'
+    buf += struct.pack('d', item)
     if mk_xml:
-        xml.write('</Cluster>\n')
+        xml.write('<DBL>\n')
+        xml.write('<Name>Timestamp</Name>\n')
+        xml.write('<Val></Val>\n')
+        xml.write('</DBL>\n')
 
     return fmt, buf
