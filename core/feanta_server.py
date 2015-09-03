@@ -36,7 +36,7 @@ Class: ServerDaemon
 class ServerDaemon(daemon.Daemon):
     def __init__(self, pidfile):
         super(ServerDaemon, self).__init__(pidfile)
-        self.workers = []
+        self.workers = {}
         self.function_map = {}
         self.log_file = LOG_FILE
 
@@ -72,7 +72,7 @@ class ServerDaemon(daemon.Daemon):
     """
     # endregion
     def link_worker(self, worker):
-        self.workers.append(worker)
+        self.workers[worker.name] = worker
         for command in worker.get_command_list():
             self.function_map[command] = worker
         worker.set_logger(self.__log)
@@ -86,8 +86,8 @@ class ServerDaemon(daemon.Daemon):
     # endregion
     def list_workers(self):
         workers_list = ''
-        for worker in self.workers:
-            workers_list += worker.name + '\n'
+        for worker in self.workers.keys():
+            workers_list += worker + '\n'
         return workers_list
 
     # region Method Description

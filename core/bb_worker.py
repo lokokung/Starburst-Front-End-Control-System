@@ -11,6 +11,10 @@ import socket
 BB_HOSTNAME = 'lna14.solar.pvt'
 BB_PORT = 50002
 
+# Scale Factors
+DRAIN_FACTOR = 0.300
+GATE_FACTOR = 0.388
+
 class BBWorker(i_worker.IWorker):
     def __init__(self):
         super(BBWorker, self).__init__()
@@ -49,6 +53,7 @@ class BBWorker(i_worker.IWorker):
         try:
             amp_num = int(acc_command[1])
             voltage = float(acc_command[2])
+            voltage /= GATE_FACTOR
         except ValueError:
             self.logger('Invalid call to LNAGATEA.')
             return None
@@ -58,7 +63,8 @@ class BBWorker(i_worker.IWorker):
 
         # Given that the parameters are all reasonable, we return the
         # command string to be processed later.
-        command = 'set amp ' + str(amp_num) + ' gatea ' + str(voltage)
+        command = ['set amp ' + str(amp_num) + ' gatea ' + str(voltage),
+                   'latch']
         return command
 
     # region Method Description
@@ -84,6 +90,7 @@ class BBWorker(i_worker.IWorker):
         try:
             amp_num = int(acc_command[1])
             voltage = float(acc_command[2])
+            voltage /= GATE_FACTOR
         except ValueError:
             self.logger('Invalid call to LNAGATEB.')
             return None
@@ -93,7 +100,8 @@ class BBWorker(i_worker.IWorker):
 
         # Given that the parameters are all reasonable, we return the
         # command string to be processed later.
-        command = 'set amp ' + str(amp_num) + ' gateb ' + str(voltage)
+        command = ['set amp ' + str(amp_num) + ' gateb ' + str(voltage),
+                   'latch']
         return command
 
     # region Method Description
@@ -118,6 +126,7 @@ class BBWorker(i_worker.IWorker):
         try:
             amp_num = int(acc_command[1])
             voltage = float(acc_command[2])
+            voltage /= DRAIN_FACTOR
         except ValueError:
             self.logger('Invalid call to LNADRAIN.')
             return None
@@ -127,7 +136,8 @@ class BBWorker(i_worker.IWorker):
 
         # Given that the parameters are all reasonable, we return the
         # command string to be processed later.
-        command = 'set amp ' + str(amp_num) + ' drain ' + str(voltage)
+        command = ['set amp ' + str(amp_num) + ' drain ' + str(voltage),
+                   'latch']
         return command
 
     # region Method Description
@@ -158,12 +168,12 @@ class BBWorker(i_worker.IWorker):
         if amp_num < 0 or amp_num > 3:
             self.logger('Invalid call to LNABIAS.')
             return None
-        if state <= 0:
+        if state != 0 and state != 1:
             return None
 
         # Given that the parameters are all reasonable, we return the
         # command string to be processed later.
-        command = 'latch'
+        command = ['set power ' + str(amp_num) + ' ' + str(state)]
         return command
 
     # ---------------------------------------------------------------
@@ -200,15 +210,17 @@ class BBWorker(i_worker.IWorker):
     def execute(self, acc_command):
 
         # Use the routine calls to generate url commands.
-        command_string = self.function_map[acc_command[0]](self, acc_command)
-        if command_string is not None:
-            self.bb_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.bb_socket.connect((self.bb_ip, BB_PORT))
-            self.logger('The following link was followed for the PDU: ' +
-                        command_string)
+        command_strings = self.function_map[acc_command[0]](self, acc_command)
+        if command_strings is not None:
+            for command_string in command_strings:
+                self.bb_socket = socket.socket(socket.AF_INET,
+                                               socket.SOCK_STREAM)
+                self.bb_socket.connect((self.bb_ip, BB_PORT))
+                self.logger('The following command was issued: ' +
+                            command_string)
 
-            command_string += '\r\n'
-            self.bb_socket.sendall(command_string)
-            self.bb_socket.close()
-            self.bb_socket = None
+                command_string += '\r\n'
+                self.bb_socket.sendall(command_string)
+                self.bb_socket.close()
+                self.bb_socket = None
 
