@@ -43,6 +43,26 @@ RQ = {'sendline': '\xb0',
 COORDINATE = {1: 'Z',
               3: 'A',
               4: 'X'}
+AXIS_SCALING = {1: 42.5636 * 96 * 32,
+                3: 23181.5208 * 96 * 32,
+                4: 3973.477 * 96 * 32}
+
+# Query Dictionary
+QUERY_STATUS_DICT = {'30': 'STOPPED',
+              '31': 'POSLIMIT',
+              '32': 'NEGLIMIT',
+              '40': 'INPOS',
+              '41': 'WARNFOLLERR',
+              '42': 'FATALFOLLERR',
+              '47': 'I2TFAULT',
+              '48': 'PHASEERRFAULT'}
+QUERY_MOTOR_DICT = {'61': 'ACTUALMPOS',
+                    '62': 'COMMPOS',
+                    '63': 'TARGETPOS'}
+QUERY_FLOAT_DICT = {'75': 'QUADCURRENT',
+                    '76': 'DIRECTCURRENT',
+                    '77': 'QUADINTEG',
+                    '78': 'DIRECTINTEG'}
 
 class BrickWorker(i_worker.IWorker):
     def __init__(self):
@@ -503,6 +523,68 @@ class BrickWorker(i_worker.IWorker):
                     'BRICKRESET': __brick_reset}
 
     # ---------------------------------------------------------------
+    # STATEFRAME HELPERS
+    # ---------------------------------------------------------------
+    def __brickmonitor_query(self, axis):
+        self.brick_socket = socket.socket(socket.AF_INET,
+                                          socket.SOCK_STREAM)
+        self.brick_socket.settimeout(1.5)
+        self.brick_socket.connect((self.brick_ip, BRICK_PORT))
+        axis_poll = {}
+
+        # Handle status polling.
+        for key, value in QUERY_STATUS_DICT.items():
+            cmd_string = ['M' + str(axis) + key]
+            cmd = self.__make_brick_command('download', 'getresponse',
+                                            0, 0, cmd_string)
+            self.brick_socket.sendall(cmd[0])
+            response = self.brick_socket.recv(1024)
+            response = response[:-2]
+            response_value = 0
+            try:
+                response_value = int(response)
+            except ValueError:
+                pass
+            axis_poll[value] = response_value
+
+        # Handle motor polling.
+        for key, value in QUERY_MOTOR_DICT.items():
+            cmd_string = ['M' + str(axis) + key]
+            cmd = self.__make_brick_command('download', 'getresponse',
+                                            0, 0, cmd_string)
+            self.brick_socket.sendall(cmd[0])
+            response = self.brick_socket.recv(1024)
+            response = response[:-2]
+            response_value = 0
+            try:
+                response_value = float(response)
+                response_value /= AXIS_SCALING[axis]
+            except ValueError:
+                pass
+            axis_poll[value] = response_value
+
+        # Handle float polling.
+        for key, value in QUERY_FLOAT_DICT.items():
+            cmd_string = ['M' + str(axis) + key]
+            cmd = self.__make_brick_command('download', 'getresponse',
+                                            0, 0, cmd_string)
+            self.brick_socket.sendall(cmd[0])
+            response = self.brick_socket.recv(1024)
+            response = response[:-2]
+            response_value = 0
+            try:
+                response_value = float(response)
+            except ValueError:
+                pass
+            axis_poll[value] = response_value
+
+        # Close connections.
+        self.brick_socket.close()
+        self.brick_socket = None
+
+        return axis_poll
+
+    # ---------------------------------------------------------------
     # INTERFACE IMPLEMENTATIONS
     # ---------------------------------------------------------------
 
@@ -555,3 +637,17 @@ class BrickWorker(i_worker.IWorker):
             except socket.error:
                 self.logger('Unable to send packet to brick.')
 
+    # region Method Description
+    """
+    Method: stateframe_query
+        Description:
+            Refer to abstract class IWorker located in i_worker.py
+            for full description.
+    """
+    # endregion
+    def stateframe_query(self):
+        stateframe_data = {}
+        for axis in [1, 3, 4]:
+            axis_dict = self.__brickmonitor_query(axis)
+            stateframe_data['AXIS' + str(axis)] = axis_dict
+        return stateframe_data

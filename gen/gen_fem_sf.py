@@ -17,10 +17,10 @@ NELEMENTS_ANTENNA_POWERSTRIP = 10
 NELEMENTS_ANTENNA_THERMAL = 9
 
 NELEMENTS_ANTENNA_RECEIVER = 4
-NELEMENTS_ANTENNA_RECEIVER_LNA = 3
+NELEMENTS_ANTENNA_RECEIVER_LNA = 6
 
 NELEMENTS_ANTENNA_SERVO = 3
-NELEMENTS_ANTENNA_SERVO_AXIS = 20
+NELEMENTS_ANTENNA_SERVO_AXIS = 16
 
 # POWERSTRIP DEFINITIONS
 POWERSTRIP_DEF = ['RFSwitchStatus',
@@ -41,6 +41,14 @@ THERMAL_DEF = ['70KStageTemp',
                'LowFreqLNATemp',
                '70KRadiationShieldTemp',
                'LowFreqFeedhornTemp']
+
+# RECEIVER DEFINITIONS
+RECEIVER_LNA_DEF = ['DRAINVOLTAGE',
+                    'DRAINCURRENT',
+                    'GATEAVOLTAGE',
+                    'GATEACURRENT',
+                    'GATEBVOLTAGE',
+                    'GATEBCURRENT']
 
 # AXIS DEFINITIONS
 AXIS_DEF = {1: 'ZAxis',
@@ -254,33 +262,14 @@ def __receiver_lna(mydict, xml, mk_xml):
     # ----------------------------------------------------------------------
     # Defaults - Receiver_LNA:
     # ----------------------------------------------------------------------
-    default_lna_drainvoltage = 0
-    default_lna_draincurrent = 0
-    default_lna_gatevoltage = 0
+    default_lna_values = 0
 
     # ----------------------------------------------------------------------
-    # ELEMENT 1> Drain voltage (double)
+    # ELEMENT 1-6> LNA Registers defined in RECEIVER_LNA_DEF (double)
     # ----------------------------------------------------------------------
-
-    # Pack a double for the temperature.
-    item = mydict.get('DRAINVOLTAGE', default_lna_drainvoltage)
-    buf += struct.pack('d', item)
-
-    # ----------------------------------------------------------------------
-    # ELEMENT 2> Drain current (double)
-    # ----------------------------------------------------------------------
-
-    # Pack a double for the temperature.
-    item = mydict.get('DRAINCURRENT', default_lna_draincurrent)
-    buf += struct.pack('d', item)
-
-    # ----------------------------------------------------------------------
-    # ELEMENT 3> Gate voltage (double)
-    # ----------------------------------------------------------------------
-
-    # Pack a double for the temperature.
-    item = mydict.get('GATEVOLTAGE', default_lna_gatevoltage)
-    buf += struct.pack('d', item)
+    for register in RECEIVER_LNA_DEF:
+        item = mydict.get(register, default_lna_values)
+        buf += struct.pack('d', item)
 
     return fmt, buf
 
@@ -374,7 +363,22 @@ def __receiver(dict, xml, mk_xml):
         xml.write('</DBL>\n')
 
         xml.write('<DBL>\n')
-        xml.write('<Name>GateVoltage</Name>\n')
+        xml.write('<Name>GateAVoltage</Name>\n')
+        xml.write('<Val></Val>\n')
+        xml.write('</DBL>\n')
+
+        xml.write('<DBL>\n')
+        xml.write('<Name>GateBVoltage</Name>\n')
+        xml.write('<Val></Val>\n')
+        xml.write('</DBL>\n')
+
+        xml.write('<DBL>\n')
+        xml.write('<Name>GateACurrent</Name>\n')
+        xml.write('<Val></Val>\n')
+        xml.write('</DBL>\n')
+
+        xml.write('<DBL>\n')
+        xml.write('<Name>GateBCurrent</Name>\n')
         xml.write('<Val></Val>\n')
         xml.write('</DBL>\n')
 
@@ -420,10 +424,6 @@ def __servo_axis(dict, axis, xml, mk_xml):
     default_directcurrent = 0
     default_quadintegrator = 0
     default_directintegrator = 0
-    default_scalefactor = 0
-    default_motorposition = 0
-    default_motorvelocity = 0
-    default_motorerror = 0
 
     # ----------------------------------------------------------------------
     # XML Cluster setup.
@@ -655,62 +655,6 @@ def __servo_axis(dict, axis, xml, mk_xml):
     if mk_xml:
         xml.write('<DBL>\n')
         xml.write('<Name>DirectIntegrator</Name>\n')
-        xml.write('<Val></Val>\n')
-        xml.write('</DBL>\n')
-
-    # ----------------------------------------------------------------------
-    # ELEMENT 17> Scale Factor (double)
-    # ----------------------------------------------------------------------
-
-    # Pack an unsigned integer for the status.
-    item = dict.get('SCALEFAC', default_scalefactor)
-    fmt += 'd'
-    buf += struct.pack('d', item)
-    if mk_xml:
-        xml.write('<DBL>\n')
-        xml.write('<Name>ScaleFactor</Name>\n')
-        xml.write('<Val></Val>\n')
-        xml.write('</DBL>\n')
-
-    # ----------------------------------------------------------------------
-    # ELEMENT 18> Motor Position (double)
-    # ----------------------------------------------------------------------
-
-    # Pack an unsigned integer for the status.
-    item = dict.get('MOTORPOS', default_motorposition)
-    fmt += 'd'
-    buf += struct.pack('d', item)
-    if mk_xml:
-        xml.write('<DBL>\n')
-        xml.write('<Name>MotorPosition</Name>\n')
-        xml.write('<Val></Val>\n')
-        xml.write('</DBL>\n')
-
-    # ----------------------------------------------------------------------
-    # ELEMENT 19> Motor Velocity (double)
-    # ----------------------------------------------------------------------
-
-    # Pack an unsigned integer for the status.
-    item = dict.get('MOTORVEL', default_motorvelocity)
-    fmt += 'd'
-    buf += struct.pack('d', item)
-    if mk_xml:
-        xml.write('<DBL>\n')
-        xml.write('<Name>MotorVelocity</Name>\n')
-        xml.write('<Val></Val>\n')
-        xml.write('</DBL>\n')
-
-    # ----------------------------------------------------------------------
-    # ELEMENT 20> Motor Error (double)
-    # ----------------------------------------------------------------------
-
-    # Pack an unsigned integer for the status.
-    item = dict.get('MOTORERR', default_motorerror)
-    fmt += 'd'
-    buf += struct.pack('d', item)
-    if mk_xml:
-        xml.write('<DBL>\n')
-        xml.write('<Name>MotorError</Name>\n')
         xml.write('<Val></Val>\n')
         xml.write('</DBL>\n')
 

@@ -77,4 +77,15 @@ class IWorker(object):
     def execute(self, acc_command):
         raise NotImplementedError
 
-
+    # region Method Description
+    """
+    Method: stateframe_query
+        Description:
+            This method is called on by the server to poll data from each
+            of the workers. Depending on the worker, the return format
+            may be different.
+        Returns:
+            Generally should return a dictionary with the polled data.
+    """
+    def stateframe_query(self):
+        raise NotImplementedError

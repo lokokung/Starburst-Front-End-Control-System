@@ -5,6 +5,7 @@
 """
 
 import i_worker
+import numpy as np
 import socket
 
 # Description of the BeagleBone device. Currently hard-coded.
@@ -14,6 +15,15 @@ BB_PORT = 50002
 # Scale Factors
 DRAIN_FACTOR = 0.300
 GATE_FACTOR = 0.388
+CURRENT_FACTOR = -2
+
+# Query Dictionary
+QUERY_DICT = {0: 'DRAINVOLTAGE',
+              1: 'DRAINCURRENT',
+              2: 'GATEAVOLTAGE',
+              3: 'GATEACURRENT',
+              4: 'GATEBVOLTAGE',
+              5: 'GATEBCURRENT'}
 
 class BBWorker(i_worker.IWorker):
     def __init__(self):
@@ -25,6 +35,7 @@ class BBWorker(i_worker.IWorker):
         self.name = 'BB-Worker'
         self.bb_socket = None
         self.bb_ip = socket.gethostbyname(BB_HOSTNAME)
+        self.dt = np.dtype('float32').newbyteorder('>')
 
     # ---------------------------------------------------------------
     # COMMAND ROUTINES
@@ -185,6 +196,36 @@ class BBWorker(i_worker.IWorker):
                     'LNABIAS': __lnabias}
 
     # ---------------------------------------------------------------
+    # STATEFRAME HELPERS
+    # ---------------------------------------------------------------
+    def __lna_query(self):
+        query_cmd = 'read\r\n'
+        self.bb_socket = socket.socket(socket.AF_INET,
+                                       socket.SOCK_STREAM)
+        self.bb_socket.settimeout(3)
+        self.bb_socket.connect((self.bb_ip, BB_PORT))
+        self.bb_socket.sendall(query_cmd)
+        read_buf = self.bb_socket.recv(96)
+        self.bb_socket.close()
+        data = np.fromstring(read_buf, self.dt)
+
+        amp0 = {}
+        amp1 = {}
+        amp2 = {}
+        amp3 = {}
+
+        for i in range(0, 6):
+            scale = 1
+            if i % 2 == 1:
+                scale = CURRENT_FACTOR
+            amp0[QUERY_DICT[i]] = data[i * 4] / scale
+            amp1[QUERY_DICT[i]] = data[i * 4 + 1] / scale
+            amp2[QUERY_DICT[i]] = data[i * 4 + 2] / scale
+            amp3[QUERY_DICT[i]] = data[i * 4 + 3] / scale
+
+        return [amp0, amp1, amp2, amp3]
+
+    # ---------------------------------------------------------------
     # INTERFACE IMPLEMENTATIONS
     # ---------------------------------------------------------------
 
@@ -215,6 +256,7 @@ class BBWorker(i_worker.IWorker):
             for command_string in command_strings:
                 self.bb_socket = socket.socket(socket.AF_INET,
                                                socket.SOCK_STREAM)
+                self.bb_socket.settimeout(3)
                 self.bb_socket.connect((self.bb_ip, BB_PORT))
                 self.logger('The following command was issued: ' +
                             command_string)
@@ -224,3 +266,14 @@ class BBWorker(i_worker.IWorker):
                 self.bb_socket.close()
                 self.bb_socket = None
 
+    # region Method Description
+    """
+    Method: stateframe_query
+        Description:
+            Refer to abstract class IWorker located in i_worker.py
+            for full description.
+    """
+    # endregion
+    def stateframe_query(self):
+        lnas = self.__lna_query()
+        return {'LNAS': lnas}

@@ -4,6 +4,7 @@
     Email: lkkung@caltech.edu
 """
 
+from bs4 import BeautifulSoup as Soup
 import mechanize
 import urllib
 import i_worker
@@ -14,7 +15,9 @@ PDU_USERNAME = 'admin'
 PDU_PASSWORD = 'power'
 
 ON_OFF_MAP = {0: 'OFF',
-              1: 'ON'}
+              1: 'ON',
+              'ON': 1,
+              'OFF': 0}
 
 
 class PDUWorker(i_worker.IWorker):
@@ -162,6 +165,42 @@ class PDUWorker(i_worker.IWorker):
                     'ND-OFF': __nd_off}
 
     # ---------------------------------------------------------------
+    # STATEFRAME HELPERS
+    # ---------------------------------------------------------------
+    def __statusandpower_query(self):
+        is_logged_in = self.__login()
+        if not is_logged_in:
+            self.logger('Unable to login to PDU.')
+            return None
+
+        # Get statuses of the 8 devices.
+        html_response = self.browser.response()
+        statuses = []
+        xml_data = html_response.read()
+        xml_soup = Soup(xml_data, 'html.parser')
+        read_statuses = xml_soup('table')[5]('font')
+        for status in read_statuses:
+            statuses.append(ON_OFF_MAP[status.text])
+
+        # Get voltage and current of the power strip
+        volts = []
+        current = []
+        read_power = xml_soup('table')[5]('th', {'colspan': '3'})
+        for power_reading in read_power:
+            readings = power_reading.text.split()
+            v = 0
+            i = 0
+            try:
+                v = float(readings[0].replace('V', ''))
+                i = float(readings[1].replace('A', ''))
+            except ValueError:
+                pass
+            volts.append(v)
+            current.append(i)
+
+        return statuses, volts, current
+
+    # ---------------------------------------------------------------
     # INTERFACE IMPLEMENTATIONS
     # ---------------------------------------------------------------
 
@@ -197,3 +236,17 @@ class PDUWorker(i_worker.IWorker):
             self.logger('The following link was followed for the PDU: ' +
                         command_string)
         self.__logout()
+
+    # region Method Description
+    """
+    Method: stateframe_query
+        Description:
+            Refer to abstract class IWorker located in i_worker.py
+            for full description.
+    """
+    # endregion
+    def stateframe_query(self):
+        statuses, volt, current = self.__statusandpower_query()
+        return {'STATUS': statuses,
+                'VOLTS': volt,
+                'CURRENT': current}
