@@ -45,25 +45,16 @@ LNA_REGISTERS = {'DRAINVOLTAGE': 'DrainVoltage',
                  'GATEBCURRENT': 'GateBCurrent'}
 
 # AXIS DEFINITIONS
-AXIS_DEF = {1: 'ZAxis',
-            3: 'RotationAxis',
-            4: 'XAxis'}
-SERVO_REGISTERS = {'STOPPED': 'Stopped',
-                   'POSLIMIT': 'PositiveLimit',
-                   'NEGLIMIT': 'NegativeLimit',
-                   'INPOS': 'InPosition',
-                   'WARNFOLLERR': 'WarningFollError',
-                   'FATALFOLLERR': 'FatalFollError',
-                   'I2TFAULT': 'I2TFault',
-                   'PHASEERRFAULT': 'PhasingErrorFault',
-                   'ADCSTATUS': 'AdcStatus',
-                   'ACTUALMPOS': 'ActualPosition',
-                   'COMMPOS': 'CommandedPosition',
-                   'TARGETPOS': 'TargetPosition',
-                   'QUADCURRENT': 'QuadCurrent',
-                   'DIRECTCURRENT': 'DirectCurrent',
-                   'QUADINTEG': 'QuadIntegrator',
-                   'DIRECTINTEG': 'DirectIntegrator'}
+AXIS_DEF = {1: 'ZFocus',
+            3: 'PositionAngle',
+            4: 'RxSelect'}
+SERVO_REGISTERS = {'AMPFAULT': 'AmplifierFault',
+                   'POSLIMIT': 'PlusLimit',
+                   'NEGLIMIT': 'MinusLimit',
+                   'P': 'Position',
+                   'PERR': 'PositionError',
+                   'POFF': 'PositionOffset',
+                   'I': 'MotorCurrent'}
 
 
 """
@@ -396,54 +387,31 @@ class TestGenerateFrontEndBinary(unittest.TestCase):
                                                      'GATEACURRENT': 13072,
                                                      'GATEBVOLTAGE': 13072,
                                                      'GATEBCURRENT': 13072}]},
-                              'SERVO': {'AXIS1': {'STOPPED': 140011,
+                              'SERVO': {'AXIS1': {'AMPFAULT': 140011,
                                                   'POSLIMIT': 140021,
                                                   'NEGLIMIT': 14031,
-                                                  'INPOS': 140041,
-                                                  'WARNFOLLERR': 140051,
-                                                  'FATALFOLLERR': 140061,
-                                                  'I2TFAULT': 140071,
-                                                  'PHASEERRFAULT': 140081,
-                                                  'ADCSTATUS': 140091,
-                                                  'ACTUALMPOS': 140101,
-                                                  'COMMPOS': 140111,
-                                                  'TARGETPOS': 140121,
-                                                  'QUADCURRENT': 140131,
-                                                  'DIRECTCURRENT': 140141,
-                                                  'QUADINTEG': 140151,
-                                                  'DIRECTINTEG': 140161},
-                                        'AXIS3': {'STOPPED': 141011,
+                                                  'P': 140041,
+                                                  'PERR': 140051,
+                                                  'POFF': 140061,
+                                                  'I': 140071},
+                                        'AXIS3': {'AMPFAULT': 141011,
                                                   'POSLIMIT': 141021,
-                                                  'NEGLIMIT': 14131,
-                                                  'INPOS': 141041,
-                                                  'WARNFOLLERR': 141051,
-                                                  'FATALFOLLERR': 141061,
-                                                  'I2TFAULT': 141071,
-                                                  'PHASEERRFAULT': 141081,
-                                                  'ADCSTATUS': 141091,
-                                                  'ACTUALMPOS': 141101,
-                                                  'COMMPOS': 141111,
-                                                  'TARGETPOS': 141121,
-                                                  'QUADCURRENT': 141131,
-                                                  'DIRECTCURRENT': 141141,
-                                                  'QUADINTEG': 141151,
-                                                  'DIRECTINTEG': 141161},
-                                        'AXIS4': {'STOPPED': 142011,
+                                                  'NEGLIMIT': 141031,
+                                                  'P': 141041,
+                                                  'PERR': 141051,
+                                                  'POFF': 141061,
+                                                  'I': 141071},
+                                        'AXIS4': {'AMPFAULT': 142011,
                                                   'POSLIMIT': 142021,
-                                                  'NEGLIMIT': 14231,
-                                                  'INPOS': 142041,
-                                                  'WARNFOLLERR': 142051,
-                                                  'FATALFOLLERR': 142061,
-                                                  'I2TFAULT': 142071,
-                                                  'PHASEERRFAULT': 142081,
-                                                  'ADCSTATUS': 142091,
-                                                  'ACTUALMPOS': 142101,
-                                                  'COMMPOS': 142111,
-                                                  'TARGETPOS': 142121,
-                                                  'QUADCURRENT': 142131,
-                                                  'DIRECTCURRENT': 142141,
-                                                  'QUADINTEG': 142151,
-                                                  'DIRECTINTEG': 142161}}}}
+                                                  'NEGLIMIT': 142031,
+                                                  'P': 142041,
+                                                  'PERR': 142051,
+                                                  'POFF': 142061,
+                                                  'I': 142071},
+                                        'HOMED': 143011,
+                                        'RXSEL': 144011},
+                              'VERSION': 1,
+                              'TIMESTAMP': 500}}
 
         self.nameMap = {}
 
@@ -546,7 +514,7 @@ class TestGenerateFrontEndBinary(unittest.TestCase):
         # -----------------------------------------------------------------
         # Test Servo
         # -----------------------------------------------------------------
-        testDic = treeDict['ApparatusServo']
+        testDic = treeDict['FRMServo']
 
         # Test each axis
         for axis_num in [1, 3, 4]:
@@ -557,6 +525,36 @@ class TestGenerateFrontEndBinary(unittest.TestCase):
                 pointer = extracted_dict[dict_key]
                 extracted = self.extract(buf, pointer)
                 self.assertEqual(extracted, actual)
+
+        # Test Homed status bit
+        actual = self.data['FEM']['SERVO']['HOMED']
+        pointer = testDic['Homed']
+        extracted = self.extract(buf, pointer)
+        self.assertEqual(extracted, actual)
+
+        # Test RxSelect status bit
+        actual = self.data['FEM']['SERVO']['RXSEL']
+        pointer = testDic['RxSel']
+        extracted = self.extract(buf, pointer)
+        self.assertEqual(extracted, actual)
+
+        # -----------------------------------------------------------------
+        # Test Timestamp, Binsize, and Version
+        # -----------------------------------------------------------------
+        # Timestamp:
+        pointer = treeDict['Version']
+        extracted = self.extract(buf, pointer)
+        self.assertEqual(extracted, 1)
+
+        # Version:
+        pointer = treeDict['Timestamp']
+        extracted = self.extract(buf, pointer)
+        self.assertEqual(extracted, 500)
+
+        # Binsize:
+        pointer = treeDict['Binsize']
+        extracted = self.extract(buf, pointer)
+        self.assertEqual(extracted, 512)
 
 
 # Main Method

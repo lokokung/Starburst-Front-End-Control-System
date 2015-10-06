@@ -11,7 +11,7 @@ import bb_worker
 import cryostat_worker
 
 
-def start(pid_file, log_file):
+def instantiate(pid_file, log_file):
     # Instantiate workers.
     pdu = pdu_worker.PDUWorker()
     brick = brick_worker.BrickWorker()
@@ -30,6 +30,10 @@ def start(pid_file, log_file):
     server.link_worker(bb)
     server.link_worker(cryo)
 
+    return server
+
+
+def start(server):
     # Start server.
     server.start()
 

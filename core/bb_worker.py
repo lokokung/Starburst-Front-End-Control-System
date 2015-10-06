@@ -200,13 +200,13 @@ class BBWorker(i_worker.IWorker):
     # ---------------------------------------------------------------
     def __lna_query(self):
         query_cmd = 'read\r\n'
-        self.bb_socket = socket.socket(socket.AF_INET,
+        query_socket = socket.socket(socket.AF_INET,
                                        socket.SOCK_STREAM)
-        self.bb_socket.settimeout(3)
-        self.bb_socket.connect((self.bb_ip, BB_PORT))
-        self.bb_socket.sendall(query_cmd)
-        read_buf = self.bb_socket.recv(96)
-        self.bb_socket.close()
+        query_socket.settimeout(3)
+        query_socket.connect((self.bb_ip, BB_PORT))
+        query_socket.sendall(query_cmd)
+        read_buf = self.query_socket.recv(96)
+        query_socket.close()
         data = np.fromstring(read_buf, self.dt)
 
         amp0 = {}

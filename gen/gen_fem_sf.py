@@ -10,7 +10,7 @@ import struct
 import shutil
 
 # NUMBER OF ELEMENTS IN CLUSTERS:
-NELEMENTS_ANTENNA = 5
+NELEMENTS_ANTENNA = 7
 
 NELEMENTS_ANTENNA_POWERSTRIP = 10
 
@@ -19,8 +19,8 @@ NELEMENTS_ANTENNA_THERMAL = 9
 NELEMENTS_ANTENNA_RECEIVER = 4
 NELEMENTS_ANTENNA_RECEIVER_LNA = 6
 
-NELEMENTS_ANTENNA_SERVO = 3
-NELEMENTS_ANTENNA_SERVO_AXIS = 16
+NELEMENTS_ANTENNA_SERVO = 5
+NELEMENTS_ANTENNA_SERVO_AXIS = 7
 
 # POWERSTRIP DEFINITIONS
 POWERSTRIP_DEF = ['RFSwitchStatus',
@@ -51,13 +51,13 @@ RECEIVER_LNA_DEF = ['DRAINVOLTAGE',
                     'GATEBCURRENT']
 
 # AXIS DEFINITIONS
-AXIS_DEF = {1: 'ZAxis',
-            3: 'RotationAxis',
-            4: 'XAxis'}
+AXIS_DEF = {1: 'ZFocus',
+            3: 'PositionAngle',
+            4: 'RxSelect'}
 
 # Version Number for FEM stateframe
-VERSION = 1               # Version Date: 9/1/15
-VERSION_DATE = '9.1.15'   # Most recent update (used to write backup file)
+VERSION = 1.2              # Version Date: 10/6/15
+VERSION_DATE = '10.6.15'   # Most recent update (used to write backup file)
 
 
 def gen_fem_sf(sf_dict, mk_xml=False):
@@ -408,22 +408,8 @@ def __servo_axis(dict, axis, xml, mk_xml):
     # ----------------------------------------------------------------------
     # Defaults - Servo_Axis:
     # ----------------------------------------------------------------------
-    default_stopped = 0
-    default_positivelimit = 0
-    default_negativelimit = 0
-    default_inposition = 0
-    default_warningfollerror = 0
-    default_fatalfollerror = 0
-    default_i2tfault = 0
-    default_phasingerrorfault = 0
-    default_adcstatus = 0
-    default_commandedposition = 0
-    default_actualposition = 0
-    default_targetposition = 0
-    default_quadcurrent = 0
-    default_directcurrent = 0
-    default_quadintegrator = 0
-    default_directintegrator = 0
+    default_double = 0
+    default_status = 0
 
     # ----------------------------------------------------------------------
     # XML Cluster setup.
@@ -435,226 +421,100 @@ def __servo_axis(dict, axis, xml, mk_xml):
                   + '</NumElts>\n')
 
     # ----------------------------------------------------------------------
-    # ELEMENT 1> Stopped: 0 = false, 1 = true (unsigned int)
+    # ELEMENT 1> Positive Limit: 0 = false, 1 = true (unsigned int)
     # ----------------------------------------------------------------------
 
     # Pack an unsigned integer for the status.
-    item = dict.get('STOPPED', default_stopped)
+    item = dict.get('POSLIMIT', default_status)
     fmt += 'I'
     buf += struct.pack('I', item)
     if mk_xml:
         xml.write('<U32>\n')
-        xml.write('<Name>Stopped</Name>\n')
+        xml.write('<Name>PlusLimit</Name>\n')
         xml.write('<Val></Val>\n')
         xml.write('</U32>\n')
 
     # ----------------------------------------------------------------------
-    # ELEMENT 2> Positive Limit: 0 = false, 1 = true (unsigned int)
+    # ELEMENT 2> Negative Limit: 0 = false, 1 = true (unsigned int)
     # ----------------------------------------------------------------------
 
     # Pack an unsigned integer for the status.
-    item = dict.get('POSLIMIT', default_positivelimit)
+    item = dict.get('NEGLIMIT', default_status)
     fmt += 'I'
     buf += struct.pack('I', item)
     if mk_xml:
         xml.write('<U32>\n')
-        xml.write('<Name>PositiveLimit</Name>\n')
+        xml.write('<Name>MinusLimit</Name>\n')
         xml.write('<Val></Val>\n')
         xml.write('</U32>\n')
 
     # ----------------------------------------------------------------------
-    # ELEMENT 3> Negative Limit: 0 = false, 1 = true (unsigned int)
+    # ELEMENT 3> Amplifier Fault: 0 = false, 1 = true (unsigned int)
     # ----------------------------------------------------------------------
 
     # Pack an unsigned integer for the status.
-    item = dict.get('NEGLIMIT', default_negativelimit)
+    item = dict.get('AMPFAULT', default_status)
     fmt += 'I'
     buf += struct.pack('I', item)
     if mk_xml:
         xml.write('<U32>\n')
-        xml.write('<Name>NegativeLimit</Name>\n')
+        xml.write('<Name>AmplifierFault</Name>\n')
         xml.write('<Val></Val>\n')
         xml.write('</U32>\n')
 
     # ----------------------------------------------------------------------
-    # ELEMENT 4> In Position: 0 = false, 1 = true (unsigned int)
+    # ELEMENT 4> Position (double)
     # ----------------------------------------------------------------------
 
-    # Pack an unsigned integer for the status.
-    item = dict.get('INPOS', default_inposition)
-    fmt += 'I'
-    buf += struct.pack('I', item)
-    if mk_xml:
-        xml.write('<U32>\n')
-        xml.write('<Name>InPosition</Name>\n')
-        xml.write('<Val></Val>\n')
-        xml.write('</U32>\n')
-
-    # ----------------------------------------------------------------------
-    # ELEMENT 5> Warning Foll Error: 0 = false, 1 = true (unsigned int)
-    # ----------------------------------------------------------------------
-
-    # Pack an unsigned integer for the status.
-    item = dict.get('WARNFOLLERR', default_warningfollerror)
-    fmt += 'I'
-    buf += struct.pack('I', item)
-    if mk_xml:
-        xml.write('<U32>\n')
-        xml.write('<Name>WarningFollError</Name>\n')
-        xml.write('<Val></Val>\n')
-        xml.write('</U32>\n')
-
-    # ----------------------------------------------------------------------
-    # ELEMENT 6> Fatal Foll Error: 0 = false, 1 = true (unsigned int)
-    # ----------------------------------------------------------------------
-
-    # Pack an unsigned integer for the status.
-    item = dict.get('FATALFOLLERR', default_fatalfollerror)
-    fmt += 'I'
-    buf += struct.pack('I', item)
-    if mk_xml:
-        xml.write('<U32>\n')
-        xml.write('<Name>FatalFollError</Name>\n')
-        xml.write('<Val></Val>\n')
-        xml.write('</U32>\n')
-
-    # ----------------------------------------------------------------------
-    # ELEMENT 7> I2T Fault: 0 = false, 1 = true (unsigned int)
-    # ----------------------------------------------------------------------
-
-    # Pack an unsigned integer for the status.
-    item = dict.get('I2TFAULT', default_i2tfault)
-    fmt += 'I'
-    buf += struct.pack('I', item)
-    if mk_xml:
-        xml.write('<U32>\n')
-        xml.write('<Name>I2TFault</Name>\n')
-        xml.write('<Val></Val>\n')
-        xml.write('</U32>\n')
-
-    # ----------------------------------------------------------------------
-    # ELEMENT 8> Phasing Error Fault: 0 = false, 1 = true (unsigned int)
-    # ----------------------------------------------------------------------
-
-    # Pack an unsigned integer for the status.
-    item = dict.get('PHASEERRFAULT', default_phasingerrorfault)
-    fmt += 'I'
-    buf += struct.pack('I', item)
-    if mk_xml:
-        xml.write('<U32>\n')
-        xml.write('<Name>PhasingErrorFault</Name>\n')
-        xml.write('<Val></Val>\n')
-        xml.write('</U32>\n')
-
-    # ----------------------------------------------------------------------
-    # ELEMENT 9> ADC Status: 0 = false, 1 = true (unsigned int)
-    # ----------------------------------------------------------------------
-
-    # Pack an unsigned integer for the status.
-    item = dict.get('ADCSTATUS', default_adcstatus)
-    fmt += 'I'
-    buf += struct.pack('I', item)
-    if mk_xml:
-        xml.write('<U32>\n')
-        xml.write('<Name>AdcStatus</Name>\n')
-        xml.write('<Val></Val>\n')
-        xml.write('</U32>\n')
-
-    # ----------------------------------------------------------------------
-    # ELEMENT 10> Commanded Position (double)
-    # ----------------------------------------------------------------------
-
-    # Pack an unsigned integer for the status.
-    item = dict.get('ACTUALMPOS', default_actualposition)
+    # Pack a double for the value.
+    item = dict.get('P', default_double)
     fmt += 'd'
     buf += struct.pack('d', item)
     if mk_xml:
         xml.write('<DBL>\n')
-        xml.write('<Name>ActualPosition</Name>\n')
+        xml.write('<Name>Position</Name>\n')
         xml.write('<Val></Val>\n')
         xml.write('</DBL>\n')
 
     # ----------------------------------------------------------------------
-    # ELEMENT 11> Actual Position (double)
+    # ELEMENT 5> Position Error (double)
     # ----------------------------------------------------------------------
 
-    # Pack an unsigned integer for the status.
-    item = dict.get('COMMPOS', default_commandedposition)
+    # Pack a double for the value.
+    item = dict.get('PERR', default_double)
     fmt += 'd'
     buf += struct.pack('d', item)
     if mk_xml:
         xml.write('<DBL>\n')
-        xml.write('<Name>CommandedPosition</Name>\n')
+        xml.write('<Name>PositionError</Name>\n')
         xml.write('<Val></Val>\n')
         xml.write('</DBL>\n')
 
     # ----------------------------------------------------------------------
-    # ELEMENT 12> Target Position (double)
+    # ELEMENT 6> Position Offset (double)
     # ----------------------------------------------------------------------
 
-    # Pack an unsigned integer for the status.
-    item = dict.get('TARGETPOS', default_targetposition)
+    # Pack a double for the value.
+    item = dict.get('POFF', default_double)
     fmt += 'd'
     buf += struct.pack('d', item)
     if mk_xml:
         xml.write('<DBL>\n')
-        xml.write('<Name>TargetPosition</Name>\n')
+        xml.write('<Name>PositionOffset</Name>\n')
         xml.write('<Val></Val>\n')
         xml.write('</DBL>\n')
 
     # ----------------------------------------------------------------------
-    # ELEMENT 13> Quad Current (double)
+    # ELEMENT 7> Motor Current (double)
     # ----------------------------------------------------------------------
 
-    # Pack an unsigned integer for the status.
-    item = dict.get('QUADCURRENT', default_quadcurrent)
+    # Pack a double for the value.
+    item = dict.get('I', default_double)
     fmt += 'd'
     buf += struct.pack('d', item)
     if mk_xml:
         xml.write('<DBL>\n')
-        xml.write('<Name>QuadCurrent</Name>\n')
-        xml.write('<Val></Val>\n')
-        xml.write('</DBL>\n')
-
-    # ----------------------------------------------------------------------
-    # ELEMENT 14> Direct Current (double)
-    # ----------------------------------------------------------------------
-
-    # Pack an unsigned integer for the status.
-    item = dict.get('DIRECTCURRENT', default_directcurrent)
-    fmt += 'd'
-    buf += struct.pack('d', item)
-    if mk_xml:
-        xml.write('<DBL>\n')
-        xml.write('<Name>DirectCurrent</Name>\n')
-        xml.write('<Val></Val>\n')
-        xml.write('</DBL>\n')
-
-    # ----------------------------------------------------------------------
-    # ELEMENT 15> Quad Integrator (double)
-    # ----------------------------------------------------------------------
-
-    # Pack an unsigned integer for the status.
-    item = dict.get('QUADINTEG', default_quadintegrator)
-    fmt += 'd'
-    buf += struct.pack('d', item)
-    if mk_xml:
-        xml.write('<DBL>\n')
-        xml.write('<Name>QuadIntegrator</Name>\n')
-        xml.write('<Val></Val>\n')
-        xml.write('</DBL>\n')
-
-    # ----------------------------------------------------------------------
-    # ELEMENT 16> Direct Integrator (double)
-    # ----------------------------------------------------------------------
-
-    # Pack an unsigned integer for the status.
-    item = dict.get('DIRECTINTEG', default_directintegrator)
-    fmt += 'd'
-    buf += struct.pack('d', item)
-    if mk_xml:
-        xml.write('<DBL>\n')
-        xml.write('<Name>DirectIntegrator</Name>\n')
+        xml.write('<Name>MotorCurrent</Name>\n')
         xml.write('<Val></Val>\n')
         xml.write('</DBL>\n')
 
@@ -670,19 +530,52 @@ def __servo(dict, xml, mk_xml):
     buf = ""
 
     # ----------------------------------------------------------------------
+    # Defaults - Servo:
+    # ----------------------------------------------------------------------
+    default_status = 0
+
+    # ----------------------------------------------------------------------
     # XML Cluster setup.
     # ----------------------------------------------------------------------
     if mk_xml:
         xml.write('<Cluster>\n')
-        xml.write('<Name>ApparatusServo</Name>\n')
+        xml.write('<Name>FRMServo</Name>\n')
         xml.write('<NumElts>' + str(NELEMENTS_ANTENNA_SERVO)
                   + '</NumElts>\n')
 
     # ----------------------------------------------------------------------
-    # ELEMENT 1-3> Axis Clusters (cluster of 9 booleans and 11 doubles)
+    # ELEMENT 1> Homed: 0 = false, 1 = true (unsigned int)
     # ----------------------------------------------------------------------
 
-    # Call __receiver_lna on each LNA to generate clusters.
+    # Pack an unsigned int for status report.
+    item = dict.get('HOMED', default_status)
+    fmt += 'I'
+    buf += struct.pack('I', item)
+    if mk_xml:
+        xml.write('<U32>\n')
+        xml.write('<Name>Homed</Name>\n')
+        xml.write('<Val></Val>\n')
+        xml.write('</U32>\n')
+
+    # ----------------------------------------------------------------------
+    # ELEMENT 2> RxSel: 0 = LF Rx, 1 = HR Rx (unsigned int)
+    # ----------------------------------------------------------------------
+
+    # Pack an unsigned int for status report.
+    item = dict.get('RXSEL', default_status)
+    fmt += 'I'
+    buf += struct.pack('I', item)
+    if mk_xml:
+        xml.write('<U32>\n')
+        xml.write('<Name>RxSel</Name>\n')
+        xml.write('<Val></Val>\n')
+        xml.write('</U32>\n')
+
+    # ----------------------------------------------------------------------
+    # ELEMENT 3-5> Axis Clusters
+    # ----------------------------------------------------------------------
+
+    # Call __servo_axis on each axis to generate clusters.
     for key, value in AXIS_DEF.items():
         item = dict.get('AXIS' + str(key), {})
         append_fmt, append_buf = __servo_axis(item, value, xml, mk_xml)
@@ -751,5 +644,29 @@ def __antenna(sf_dict, xml, mk_xml):
         xml.write('<Name>Timestamp</Name>\n')
         xml.write('<Val></Val>\n')
         xml.write('</DBL>\n')
+
+    # ----------------------------------------------------------------------
+    # Dump Version
+    # ----------------------------------------------------------------------
+    item = sf_dict.get('VERSION', VERSION)
+    fmt += 'd'
+    buf += struct.pack('d', item)
+    if mk_xml:
+        xml.write('<DBL>\n')
+        xml.write('<Name>Version</Name>\n')
+        xml.write('<Val></Val>\n')
+        xml.write('</DBL>\n')
+
+    # ----------------------------------------------------------------------
+    # Dump Binsize
+    # ----------------------------------------------------------------------
+    fmt += 'I'
+    temp_buf = buf + struct.pack('I', 0)
+    buf += struct.pack('I', len(temp_buf))
+    if mk_xml:
+        xml.write('<U32>\n')
+        xml.write('<Name>Binsize</Name>\n')
+        xml.write('<Val></Val>\n')
+        xml.write('</U32>\n')
 
     return fmt, buf

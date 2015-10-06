@@ -46,23 +46,7 @@ COORDINATE = {1: 'Z',
 AXIS_SCALING = {1: 42.5636 * 96 * 32,
                 3: 23181.5208 * 96 * 32,
                 4: 3973.477 * 96 * 32}
-
-# Query Dictionary
-QUERY_STATUS_DICT = {'30': 'STOPPED',
-              '31': 'POSLIMIT',
-              '32': 'NEGLIMIT',
-              '40': 'INPOS',
-              '41': 'WARNFOLLERR',
-              '42': 'FATALFOLLERR',
-              '47': 'I2TFAULT',
-              '48': 'PHASEERRFAULT'}
-QUERY_MOTOR_DICT = {'61': 'ACTUALMPOS',
-                    '62': 'COMMPOS',
-                    '63': 'TARGETPOS'}
-QUERY_FLOAT_DICT = {'75': 'QUADCURRENT',
-                    '76': 'DIRECTCURRENT',
-                    '77': 'QUADINTEG',
-                    '78': 'DIRECTINTEG'}
+MPADDRESSSTART = 900
 
 class BrickWorker(i_worker.IWorker):
     def __init__(self):
@@ -525,64 +509,21 @@ class BrickWorker(i_worker.IWorker):
     # ---------------------------------------------------------------
     # STATEFRAME HELPERS
     # ---------------------------------------------------------------
-    def __brickmonitor_query(self, axis):
-        self.brick_socket = socket.socket(socket.AF_INET,
-                                          socket.SOCK_STREAM)
-        self.brick_socket.settimeout(1.5)
-        self.brick_socket.connect((self.brick_ip, BRICK_PORT))
-        axis_poll = {}
+    def __brickmonitor_query(self, command):
+        query_socket = socket.socket(socket.AF_INET,
+                                     socket.SOCK_STREAM)
+        query_socket.settimeout(1.5)
+        query_socket.connect((self.brick_ip, BRICK_PORT))
+        cmd_string = [command]
+        cmd = self.__make_brick_command('download', 'getresponse',
+                                        0, 0, cmd_string)
+        query_socket.sendall(cmd[0])
+        response = query_socket.recv(1024)
+        response = response[:-2]
 
-        # Handle status polling.
-        for key, value in QUERY_STATUS_DICT.items():
-            cmd_string = ['M' + str(axis) + key]
-            cmd = self.__make_brick_command('download', 'getresponse',
-                                            0, 0, cmd_string)
-            self.brick_socket.sendall(cmd[0])
-            response = self.brick_socket.recv(1024)
-            response = response[:-2]
-            response_value = 0
-            try:
-                response_value = int(response)
-            except ValueError:
-                pass
-            axis_poll[value] = response_value
+        query_socket.close()
 
-        # Handle motor polling.
-        for key, value in QUERY_MOTOR_DICT.items():
-            cmd_string = ['M' + str(axis) + key]
-            cmd = self.__make_brick_command('download', 'getresponse',
-                                            0, 0, cmd_string)
-            self.brick_socket.sendall(cmd[0])
-            response = self.brick_socket.recv(1024)
-            response = response[:-2]
-            response_value = 0
-            try:
-                response_value = float(response)
-                response_value /= AXIS_SCALING[axis]
-            except ValueError:
-                pass
-            axis_poll[value] = response_value
-
-        # Handle float polling.
-        for key, value in QUERY_FLOAT_DICT.items():
-            cmd_string = ['M' + str(axis) + key]
-            cmd = self.__make_brick_command('download', 'getresponse',
-                                            0, 0, cmd_string)
-            self.brick_socket.sendall(cmd[0])
-            response = self.brick_socket.recv(1024)
-            response = response[:-2]
-            response_value = 0
-            try:
-                response_value = float(response)
-            except ValueError:
-                pass
-            axis_poll[value] = response_value
-
-        # Close connections.
-        self.brick_socket.close()
-        self.brick_socket = None
-
-        return axis_poll
+        return response
 
     # ---------------------------------------------------------------
     # INTERFACE IMPLEMENTATIONS
@@ -646,8 +587,58 @@ class BrickWorker(i_worker.IWorker):
     """
     # endregion
     def stateframe_query(self):
-        stateframe_data = {}
-        for axis in [1, 3, 4]:
-            axis_dict = self.__brickmonitor_query(axis)
-            stateframe_data['AXIS' + str(axis)] = axis_dict
+        stateframe_data = {'AXIS1': {},
+                           'AXIS3': {},
+                           'AXIS4': {}}
+
+        stateframe_data['HOMED'] = \
+            int(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 1)))
+        stateframe_data['RXSEL'] = \
+            int(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 2)))
+
+        stateframe_data['AXIS1']['P'] = \
+            float(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 3)))
+        stateframe_data['AXIS1']['PERR'] = \
+            float(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 4)))
+        stateframe_data['AXIS1']['POFF'] = \
+            float(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 5)))
+        stateframe_data['AXIS1']['I'] = \
+            float(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 6)))
+        stateframe_data['AXIS1']['POSLIMIT'] = \
+            int(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 7)))
+        stateframe_data['AXIS1']['NEGLIMIT'] = \
+            int(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 8)))
+        stateframe_data['AXIS1']['AMPFAULT'] = \
+            int(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 9)))
+
+        stateframe_data['AXIS3']['P'] = \
+            float(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 10)))
+        stateframe_data['AXIS3']['PERR'] = \
+            float(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 11)))
+        stateframe_data['AXIS3']['POFF'] = \
+            float(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 12)))
+        stateframe_data['AXIS3']['I'] = \
+            float(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 13)))
+        stateframe_data['AXIS3']['POSLIMIT'] = \
+            int(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 14)))
+        stateframe_data['AXIS3']['NEGLIMIT'] = \
+            int(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 15)))
+        stateframe_data['AXIS3']['AMPFAULT'] = \
+            int(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 16)))
+
+        stateframe_data['AXIS4']['P'] = \
+            float(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 17)))
+        stateframe_data['AXIS4']['PERR'] = \
+            float(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 18)))
+        stateframe_data['AXIS4']['POFF'] = \
+            float(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 19)))
+        stateframe_data['AXIS4']['I'] = \
+            float(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 20)))
+        stateframe_data['AXIS4']['POSLIMIT'] = \
+            int(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 21)))
+        stateframe_data['AXIS4']['NEGLIMIT'] = \
+            int(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 22)))
+        stateframe_data['AXIS4']['AMPFAULT'] = \
+            int(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 23)))
+
         return stateframe_data

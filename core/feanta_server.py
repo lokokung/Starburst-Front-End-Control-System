@@ -18,6 +18,9 @@ LOG_FILE = 'bridge_server.log'
 # Currently hard-coded, will eventually be read from acc.ini
 HOST = ''
 HOST_PORT = 5676
+ACC_HOSTNAME = 'acc.solar.pvt'
+ACC_PORT = 5675
+VERSION = 1.2  # Version date: 10/6/2015
 
 # region Class Description
 """
@@ -110,6 +113,71 @@ class ServerDaemon(daemon.Daemon):
     # endregion
     def list_commands(self):
         return self.function_map.keys()
+
+    def make_stateframe_dict(self):
+        fem_dict = {}
+
+        # Handle powerstrip cluster.
+        worker = self.workers.get('PDU-Worker', None)
+        if worker is not None:
+            try:
+                fem_dict['POWERSTRIP'] = worker.stateframe_query()
+            except:
+                fem_dict['POWERSTRIP'] = {}
+        else:
+            fem_dict['POWERSTRIP'] = {}
+
+        # Handle thermal cluster.
+        worker = self.workers.get('Cryostat-Worker', None)
+        working_dict = {}
+        if worker is not None:
+            try:
+                working_dict = worker.stateframe_query()
+            except:
+                pass
+
+        worker = self.workers.get('Temp-Worker', None)
+        if worker is not None:
+            try:
+                working_dict['FOCUSBOX'] = worker.stateframe_query()
+            except:
+                working_dict['FOCUSBOX'] = 0
+        else:
+            working_dict['FOCUSBOX'] = 0
+
+        fem_dict['THERMAL'] = working_dict
+
+        # Handle receiver cluster.
+        worker = self.workers.get('BB-Worker', None)
+        working_dict = {}
+        if worker is not None:
+            try:
+                working_dict = worker.stateframe_query()
+            except:
+                pass
+
+        working_dict['LOFREQSTATUS'] = 0
+        working_dict['HIFREQSTATUS'] = 0
+        working_dict['NOISESTATUS'] = 0
+        fem_dict['RECEIVER'] = working_dict
+
+        # Handle servo cluster.
+        worker = self.workers.get('GeoBrick-Worker', None)
+        if worker is not None:
+            try:
+                fem_dict['SERVO'] = worker.stateframe_query()
+            except:
+                fem_dict['SERVO'] = {}
+        else:
+            fem_dict['SERVO'] = {}
+
+        # Handle version.
+        fem_dict['VERSION'] = VERSION
+
+        # Handle timestamp
+        fem_dict['TIMESTAMP'] = time.time() + 2082844800
+
+        return {'FEM': fem_dict}
 
     # region Method Description
     """
