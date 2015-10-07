@@ -134,7 +134,7 @@ def __powerstrip(dict, xml, mk_xml):
     item = dict.get('STATUS', default_statuses)
     for i in range(0, 8):
         fmt += 'I'
-        buf += struct.pack('I', item[i])
+        buf += struct.pack('I', int(item[i]))
 
         # Append to XML file
         if mk_xml:

@@ -4,11 +4,12 @@
     Email: lkkung@caltech.edu
 """
 
-import daemon
 import datetime
 import socket
 import sys
 import time
+import threading
+import gen_fem_sf
 
 # Logging information.
 TIMESTAMP_FMT = '%Y-%m-%d %H:%M:%S'
@@ -21,6 +22,7 @@ HOST_PORT = 5676
 ACC_HOSTNAME = 'acc.solar.pvt'
 ACC_PORT = 5675
 VERSION = 1.2  # Version date: 10/6/2015
+
 
 # region Class Description
 """
@@ -36,12 +38,17 @@ Class: ServerDaemon
             by the stop function or to be stopped manually in Linux.
 """
 # endregion
-class ServerDaemon(daemon.Daemon):
+class ServerDaemon():
     def __init__(self, pidfile):
-        super(ServerDaemon, self).__init__(pidfile)
+        self.pidfile_path = pidfile
+        self.pidfile_timeout = 5
+        self.stdin_path = '/dev/null'
+        self.stdout_path = '/dev/null'
+        self.stderr_path = '/dev/null'
         self.workers = {}
         self.function_map = {}
         self.log_file = LOG_FILE
+        self.acc_ip = socket.gethostbyname(ACC_HOSTNAME)
 
     # ---------------------------------------------------------------
     # BASIC ROUTINES:
@@ -179,6 +186,20 @@ class ServerDaemon(daemon.Daemon):
 
         return {'FEM': fem_dict}
 
+    def send_stateframe_dict(self):
+        fem_dict = self.make_stateframe_dict()
+        fmt, buf, xml = gen_fem_sf.gen_fem_sf(fem_dict)
+        # packet_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # packet_socket.settimeout(0.3)
+        # packet_socket.connect((self.acc_ip, ACC_PORT))
+        # packet_socket.sendall(buf)
+        # packet_socket.close()
+        persec = open('/tmp/persec.txt', 'a')
+        persec.write(buf + '\n')
+        persec.close()
+        threading.Timer(1, self.send_stateframe_dict).start()
+
+
     # region Method Description
     """
     Method: run
@@ -199,6 +220,9 @@ class ServerDaemon(daemon.Daemon):
             sys.exit()
         acc_listener.listen(1)
         self.__log('Successfully setup listener')
+
+        polling_thread = threading.Thread(target=self.send_stateframe_dict())
+        polling_thread.start()
 
         while True:
             # Wait for a connection from ACC.
@@ -222,4 +246,3 @@ class ServerDaemon(daemon.Daemon):
             except KeyError:
                 self.__log('Unrecognized command received: ' +
                            acc_command[0] + '.')
-

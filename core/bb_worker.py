@@ -201,7 +201,7 @@ class BBWorker(i_worker.IWorker):
     def __lna_query(self):
         query_cmd = 'read\r\n'
         query_socket = socket.socket(socket.AF_INET,
-                                       socket.SOCK_STREAM)
+                                     socket.SOCK_STREAM)
         query_socket.settimeout(3)
         query_socket.connect((self.bb_ip, BB_PORT))
         query_socket.sendall(query_cmd)
