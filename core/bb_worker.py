@@ -205,7 +205,7 @@ class BBWorker(i_worker.IWorker):
         query_socket.settimeout(3)
         query_socket.connect((self.bb_ip, BB_PORT))
         query_socket.sendall(query_cmd)
-        read_buf = self.query_socket.recv(96)
+        read_buf = query_socket.recv(96)
         query_socket.close()
         data = np.fromstring(read_buf, self.dt)
 

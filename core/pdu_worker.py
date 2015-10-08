@@ -20,6 +20,9 @@ ON_OFF_MAP = {0: 'OFF',
               'ON': 1,
               'OFF': 0}
 
+LOGIN_DATA = {'Username': PDU_USERNAME,
+              'Password': PDU_PASSWORD}
+
 
 class PDUWorker(i_worker.IWorker):
     def __init__(self):
@@ -44,18 +47,24 @@ class PDUWorker(i_worker.IWorker):
     """
     # endregion
     def __login(self):
-        self.browser = mechanize.Browser()
-        self.browser.set_handle_robots(False)
-        self.browser.set_handle_refresh(False)
+        try:
+            self.browser.open(PDU_HOSTNAME + '/index.htm', timeout=3)
+            if self.browser.geturl() == PDU_HOSTNAME + '/index.htm':
+                return True
+            else:
+                raise Exception()
+        except:
+            self.browser = mechanize.Browser()
+            self.browser.set_handle_robots(False)
+            self.browser.set_handle_refresh(False)
 
-        login_data = {'Username': PDU_USERNAME,
-                      'Password': PDU_PASSWORD}
-        encoded_data = urllib.urlencode(login_data)
-        self.browser.open(PDU_HOSTNAME + '/login.tgi', encoded_data, timeout=3)
-        self.browser.open(PDU_HOSTNAME + '/index.htm', timeout=3)
-        if self.browser.geturl() == PDU_HOSTNAME + '/index.htm':
-            self.logger('Successfully logged into PDU.')
-            return True
+            encoded_data = urllib.urlencode(LOGIN_DATA)
+            self.browser.open(PDU_HOSTNAME + '/login.tgi',
+                              encoded_data, timeout=3)
+            self.browser.open(PDU_HOSTNAME + '/index.htm', timeout=3)
+            if self.browser.geturl() == PDU_HOSTNAME + '/index.htm':
+                self.logger('Successfully logged into PDU.')
+                return True
         return False
 
     # region Method Description
@@ -170,39 +179,35 @@ class PDUWorker(i_worker.IWorker):
     # STATEFRAME HELPERS
     # ---------------------------------------------------------------
     def __statusandpower_query(self):
-        self.lock.aquire()
         statuses = []
         volts = []
         current = []
-        try:
-            is_logged_in = self.__login()
-            if not is_logged_in:
-                self.logger('Unable to login to PDU.')
+        is_logged_in = self.__login()
+        if not is_logged_in:
+            self.logger('Unable to login to PDU.')
 
-            else:
-                # Get statuses of the 8 devices.
-                html_response = self.browser.response()
-                xml_data = html_response.read()
-                xml_soup = Soup(xml_data, 'html.parser')
-                read_statuses = xml_soup('table')[5]('font')
-                for status in read_statuses:
-                    statuses.append(ON_OFF_MAP[status.text])
+        else:
+            # Get statuses of the 8 devices.
+            html_response = self.browser.response()
+            xml_data = html_response.read()
+            xml_soup = Soup(xml_data, 'html.parser')
+            read_statuses = xml_soup('table')[5]('font')
+            for status in read_statuses:
+                statuses.append(ON_OFF_MAP[status.text])
 
-                # Get voltage and current of the power strip
-                read_power = xml_soup('table')[5]('th', {'colspan': '3'})
-                for power_reading in read_power:
-                    readings = power_reading.text.split()
-                    v = 0
-                    i = 0
-                    try:
-                        v = float(readings[0].replace('V', ''))
-                        i = float(readings[1].replace('A', ''))
-                    except ValueError:
-                        pass
-                    volts.append(v)
-                    current.append(i)
-        finally:
-            self.lock.release()
+            # Get voltage and current of the power strip
+            read_power = xml_soup('table')[5]('th', {'colspan': '3'})
+            for power_reading in read_power:
+                readings = power_reading.text.split()
+                v = 0
+                i = 0
+                try:
+                    v = float(readings[0].replace('V', ''))
+                    i = float(readings[1].replace('A', ''))
+                except ValueError:
+                    pass
+                volts.append(v)
+                current.append(i)
 
         return statuses, volts, current
 
@@ -230,24 +235,19 @@ class PDUWorker(i_worker.IWorker):
     """
     # endregion
     def execute(self, acc_command):
-        self.lock.aquire()
-        try:
-            is_logged_in = self.__login()
-            if is_logged_in:
+        is_logged_in = self.__login()
+        if is_logged_in:
 
-                # Use the routine calls to generate url commands.
-                command_string = self.function_map[acc_command[0]]\
-                                 (self, acc_command)
-                if command_string is not None:
-                    self.browser.open(command_string)
-                    self.logger(
-                        'The following link was followed for the PDU: ' +
-                        command_string)
-                self.__logout()
-            else:
-                self.logger('Unable to login to PDU.')
-        finally:
-            self.lock.release()
+            # Use the routine calls to generate url commands.
+            command_string = self.function_map[acc_command[0]]\
+                                (self, acc_command)
+            if command_string is not None:
+                self.browser.open(command_string)
+                self.logger(
+                    'The following link was followed for the PDU: ' +
+                    command_string)
+        else:
+            self.logger('Unable to login to PDU.')
 
     # region Method Description
     """
