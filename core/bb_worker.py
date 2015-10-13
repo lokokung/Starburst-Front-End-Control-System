@@ -11,6 +11,7 @@ import socket
 # Description of the BeagleBone device. Currently hard-coded.
 BB_HOSTNAME = 'lna14.solar.pvt'
 BB_PORT = 50002
+BB_TIMEOUT = 0.3
 
 # Scale Factors
 DRAIN_FACTOR = 0.300
@@ -19,10 +20,10 @@ CURRENT_FACTOR = -2
 
 # Query Dictionary
 QUERY_DICT = {0: 'DRAINVOLTAGE',
-              1: 'DRAINCURRENT',
               2: 'GATEAVOLTAGE',
-              3: 'GATEACURRENT',
               4: 'GATEBVOLTAGE',
+              1: 'DRAINCURRENT',
+              3: 'GATEACURRENT',
               5: 'GATEBCURRENT'}
 
 class BBWorker(i_worker.IWorker):
@@ -202,7 +203,7 @@ class BBWorker(i_worker.IWorker):
         query_cmd = 'read\r\n'
         query_socket = socket.socket(socket.AF_INET,
                                      socket.SOCK_STREAM)
-        query_socket.settimeout(3)
+        query_socket.settimeout(BB_TIMEOUT)
         query_socket.connect((self.bb_ip, BB_PORT))
         query_socket.sendall(query_cmd)
         read_buf = query_socket.recv(96)
@@ -256,7 +257,7 @@ class BBWorker(i_worker.IWorker):
             for command_string in command_strings:
                 self.bb_socket = socket.socket(socket.AF_INET,
                                                socket.SOCK_STREAM)
-                self.bb_socket.settimeout(3)
+                self.bb_socket.settimeout(BB_TIMEOUT)
                 self.bb_socket.connect((self.bb_ip, BB_PORT))
                 self.logger('The following command was issued: ' +
                             command_string)

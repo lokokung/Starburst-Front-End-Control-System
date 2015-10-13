@@ -10,6 +10,7 @@ import sys
 import time
 import threading
 import gen_fem_sf
+import traceback
 
 # Logging information.
 TIMESTAMP_FMT = '%Y-%m-%d %H:%M:%S'
@@ -60,7 +61,7 @@ class ServerDaemon():
         return timestamp
 
     def __log(self, message):
-        log_message = self.__get_timestamp() + ': ' + message + '\n'
+        log_message = self.__get_timestamp() + ': ' + str(message) + '\n'
         f = open(self.log_file, "a")
         f.write(log_message)
         f.close()
@@ -129,8 +130,9 @@ class ServerDaemon():
         if worker is not None:
             try:
                 fem_dict['POWERSTRIP'] = worker.stateframe_query()
-            except:
+            except Exception, e:
                 fem_dict['POWERSTRIP'] = {}
+                self.__log(traceback.format_exc())
         else:
             fem_dict['POWERSTRIP'] = {}
 
@@ -140,15 +142,16 @@ class ServerDaemon():
         if worker is not None:
             try:
                 working_dict = worker.stateframe_query()
-            except:
-                pass
+            except Exception, s:
+                self.__log(traceback.format_exc())
 
         worker = self.workers.get('Temp-Worker', None)
         if worker is not None:
             try:
                 working_dict['FOCUSBOX'] = worker.stateframe_query()
-            except:
+            except Exception, e:
                 working_dict['FOCUSBOX'] = 0
+                self.__log(traceback.format_exc())
         else:
             working_dict['FOCUSBOX'] = 0
 
@@ -160,7 +163,7 @@ class ServerDaemon():
         if worker is not None:
             try:
                 working_dict = worker.stateframe_query()
-            except:
+            except Exception, e:
                 pass
 
         working_dict['LOFREQSTATUS'] = 0
@@ -173,8 +176,9 @@ class ServerDaemon():
         if worker is not None:
             try:
                 fem_dict['SERVO'] = worker.stateframe_query()
-            except:
+            except Exception, e:
                 fem_dict['SERVO'] = {}
+                self.__log(traceback.format_exc())
         else:
             fem_dict['SERVO'] = {}
 
@@ -189,15 +193,15 @@ class ServerDaemon():
     def send_stateframe_dict(self):
         fem_dict = self.make_stateframe_dict()
         fmt, buf, xml = gen_fem_sf.gen_fem_sf(fem_dict)
-        # packet_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        # packet_socket.settimeout(0.3)
-        # packet_socket.connect((self.acc_ip, ACC_PORT))
-        # packet_socket.sendall(buf)
-        # packet_socket.close()
-        persec = open('/tmp/persec.txt', 'a')
-        persec.write(buf + '\n')
-        persec.close()
-        threading.Timer(1, self.send_stateframe_dict).start()
+        packet_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        packet_socket.settimeout(0.3)
+        packet_socket.connect((self.acc_ip, ACC_PORT))
+        packet_socket.sendall(buf)
+        packet_socket.close()
+        # persec = open('/tmp/persec.txt', 'a')
+        # persec.write(buf + '\n')
+        # persec.close()
+        threading.Timer(0.3, self.send_stateframe_dict).start()
 
 
     # region Method Description
@@ -221,7 +225,7 @@ class ServerDaemon():
         acc_listener.listen(1)
         self.__log('Successfully setup listener')
 
-        polling_thread = threading.Thread(target=self.send_stateframe_dict())
+        polling_thread = threading.Thread(target=self.send_stateframe_dict)
         polling_thread.start()
 
         while True:

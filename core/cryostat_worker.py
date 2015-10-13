@@ -8,12 +8,12 @@ import i_worker
 import serial
 
 # Description of Lakeshore device. Currently hard-coded.
-CRYO_PORT = '/dev/ttyUSB2'
+CRYO_PORT = '/dev/ttyUSB0'
 CRYO_BAUD = 9600
 CRYO_BYTESIZE = 7
 CRYO_STOPBITS = 1
 CRYO_PARITY = 'O'
-CRYO_TIMEOUT = 3
+CRYO_TIMEOUT = 0.3
 
 class CryoWorker(i_worker.IWorker):
     def __init__(self):
@@ -50,7 +50,7 @@ class CryoWorker(i_worker.IWorker):
             try:
                 returnVal.append(float(number))
             except ValueError:
-                returnVal.append(None)
+                returnVal.append(0)
         self.serial_connection.close()
         self.serial_connection = None
         return returnVal

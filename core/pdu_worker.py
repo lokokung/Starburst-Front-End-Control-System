@@ -23,6 +23,8 @@ ON_OFF_MAP = {0: 'OFF',
 LOGIN_DATA = {'Username': PDU_USERNAME,
               'Password': PDU_PASSWORD}
 
+PDU_TIMEOUT = 0.3
+
 
 class PDUWorker(i_worker.IWorker):
     def __init__(self):
@@ -48,7 +50,7 @@ class PDUWorker(i_worker.IWorker):
     # endregion
     def __login(self):
         try:
-            self.browser.open(PDU_HOSTNAME + '/index.htm', timeout=3)
+            self.browser.open(PDU_HOSTNAME + '/index.htm', timeout=PDU_TIMEOUT)
             if self.browser.geturl() == PDU_HOSTNAME + '/index.htm':
                 return True
             else:
@@ -60,8 +62,8 @@ class PDUWorker(i_worker.IWorker):
 
             encoded_data = urllib.urlencode(LOGIN_DATA)
             self.browser.open(PDU_HOSTNAME + '/login.tgi',
-                              encoded_data, timeout=3)
-            self.browser.open(PDU_HOSTNAME + '/index.htm', timeout=3)
+                              encoded_data, timeout=PDU_TIMEOUT)
+            self.browser.open(PDU_HOSTNAME + '/index.htm', timeout=PDU_TIMEOUT)
             if self.browser.geturl() == PDU_HOSTNAME + '/index.htm':
                 self.logger('Successfully logged into PDU.')
                 return True

@@ -10,7 +10,7 @@ import struct
 import shutil
 
 # NUMBER OF ELEMENTS IN CLUSTERS:
-NELEMENTS_ANTENNA = 7
+NELEMENTS_ANTENNA = 6
 
 NELEMENTS_ANTENNA_POWERSTRIP = 10
 
@@ -27,27 +27,27 @@ POWERSTRIP_DEF = ['RFSwitchStatus',
                   'OpticalTxRabbitStatus',
                   'DeltaTauBrickStatus',
                   'ComputerStatus',
-                  '12VLNABiasStatus',
-                  '5VLNABiasBBStatus',
-                  '2ndAmpsStatus',
+                  'LNA12VBiasStatus',
+                  'LNA5VBiasBBStatus',
+                  'SecondAmpsStatus',
                   'NoiseDiodeStatus']
 
 # THERMAL DEFINITIONS
-THERMAL_DEF = ['70KStageTemp',
+THERMAL_DEF = ['SecondStageTemp',
                'HiFreq15KPlateTemp',
                'HiFreqLNATemp',
                'HiFreqFeedhornTemp',
-               '15KStageTemp',
+               'FirstStageTemp',
                'LowFreqLNATemp',
-               '70KRadiationShieldTemp',
+               'RadiationShieldTemp',
                'LowFreqFeedhornTemp']
 
 # RECEIVER DEFINITIONS
 RECEIVER_LNA_DEF = ['DRAINVOLTAGE',
-                    'DRAINCURRENT',
                     'GATEAVOLTAGE',
-                    'GATEACURRENT',
                     'GATEBVOLTAGE',
+                    'DRAINCURRENT',
+                    'GATEACURRENT',
                     'GATEBCURRENT']
 
 # AXIS DEFINITIONS
@@ -62,7 +62,7 @@ VERSION_DATE = '10.6.15'   # Most recent update (used to write backup file)
 
 def gen_fem_sf(sf_dict, mk_xml=False):
     # Set up file name, format string, and buffer.
-    xmlFile = r'tmp/fem_stateframe.xml'
+    xmlFile = r'tmp/femab_stateframe.xml'
     fmt = '<'
     buf = ''
     xml = None
@@ -224,7 +224,12 @@ def __thermal(dict, xml, mk_xml):
     item = dict.get('CRYOSTAT', default_cryostat_temp)
     for i in range(0, 8):
         fmt += 'd'
-        buf += struct.pack('d', item[i])
+        temp_value = 0
+        try:
+            temp_value = item[i]
+        except:
+            pass
+        buf += struct.pack('d', temp_value)
 
         # Append to XML file
         if mk_xml:
@@ -267,8 +272,8 @@ def __receiver_lna(mydict, xml, mk_xml):
     # ----------------------------------------------------------------------
     # ELEMENT 1-6> LNA Registers defined in RECEIVER_LNA_DEF (double)
     # ----------------------------------------------------------------------
-    for register in RECEIVER_LNA_DEF:
-        item = mydict.get(register, default_lna_values)
+    for i in range(0, 6):
+        item = mydict.get(RECEIVER_LNA_DEF[i], default_lna_values)
         buf += struct.pack('d', item)
 
     return fmt, buf
@@ -358,17 +363,17 @@ def __receiver(dict, xml, mk_xml):
         xml.write('</DBL>\n')
 
         xml.write('<DBL>\n')
-        xml.write('<Name>DrainCurrent</Name>\n')
-        xml.write('<Val></Val>\n')
-        xml.write('</DBL>\n')
-
-        xml.write('<DBL>\n')
         xml.write('<Name>GateAVoltage</Name>\n')
         xml.write('<Val></Val>\n')
         xml.write('</DBL>\n')
 
         xml.write('<DBL>\n')
         xml.write('<Name>GateBVoltage</Name>\n')
+        xml.write('<Val></Val>\n')
+        xml.write('</DBL>\n')
+
+        xml.write('<DBL>\n')
+        xml.write('<Name>DrainCurrent</Name>\n')
         xml.write('<Val></Val>\n')
         xml.write('</DBL>\n')
 
@@ -567,7 +572,7 @@ def __servo(dict, xml, mk_xml):
     buf += struct.pack('I', item)
     if mk_xml:
         xml.write('<U32>\n')
-        xml.write('<Name>RxSel</Name>\n')
+        xml.write('<Name>SelectedRx</Name>\n')
         xml.write('<Val></Val>\n')
         xml.write('</U32>\n')
 
@@ -656,17 +661,5 @@ def __antenna(sf_dict, xml, mk_xml):
         xml.write('<Name>Version</Name>\n')
         xml.write('<Val></Val>\n')
         xml.write('</DBL>\n')
-
-    # ----------------------------------------------------------------------
-    # Dump Binsize
-    # ----------------------------------------------------------------------
-    fmt += 'I'
-    temp_buf = buf + struct.pack('I', 0)
-    buf += struct.pack('I', len(temp_buf))
-    if mk_xml:
-        xml.write('<U32>\n')
-        xml.write('<Name>Binsize</Name>\n')
-        xml.write('<Val></Val>\n')
-        xml.write('</U32>\n')
 
     return fmt, buf

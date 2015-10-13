@@ -18,19 +18,19 @@ POWERSTRIP_DEF = ['RFSwitchStatus',
                   'OpticalTxRabbitStatus',
                   'DeltaTauBrickStatus',
                   'ComputerStatus',
-                  '12VLNABiasStatus',
-                  '5VLNABiasBBStatus',
-                  '2ndAmpsStatus',
+                  'LNA12VBiasStatus',
+                  'LNA5VBiasBBStatus',
+                  'SecondAmpsStatus',
                   'NoiseDiodeStatus']
 
 # THERMAL DEFINITIONS
-THERMAL_DEF = ['70KStageTemp',
+THERMAL_DEF = ['SecondStageTemp',
                'HiFreq15KPlateTemp',
                'HiFreqLNATemp',
                'HiFreqFeedhornTemp',
-               '15KStageTemp',
+               'FirstStageTemp',
                'LowFreqLNATemp',
-               '70KRadiationShieldTemp',
+               'RadiationShieldTemp',
                'LowFreqFeedhornTemp']
 
 # RECEIVER DEFINITIONS
@@ -366,27 +366,27 @@ class TestGenerateFrontEndBinary(unittest.TestCase):
                                            'LNAS': [{'DRAINVOLTAGE': 13041,
                                                      'DRAINCURRENT': 13042,
                                                      'GATEAVOLTAGE': 13043,
-                                                     'GATEACURRENT': 13042,
-                                                     'GATEBVOLTAGE': 13042,
-                                                     'GATEBCURRENT': 13042},
+                                                     'GATEACURRENT': 13044,
+                                                     'GATEBVOLTAGE': 13045,
+                                                     'GATEBCURRENT': 13046},
                                                     {'DRAINVOLTAGE': 13051,
                                                      'DRAINCURRENT': 13052,
                                                      'GATEAVOLTAGE': 13053,
-                                                     'GATEACURRENT': 13052,
-                                                     'GATEBVOLTAGE': 13052,
-                                                     'GATEBCURRENT': 13052},
+                                                     'GATEACURRENT': 13054,
+                                                     'GATEBVOLTAGE': 13055,
+                                                     'GATEBCURRENT': 13056},
                                                     {'DRAINVOLTAGE': 13061,
                                                      'DRAINCURRENT': 13062,
                                                      'GATEAVOLTAGE': 13063,
-                                                     'GATEACURRENT': 13062,
-                                                     'GATEBVOLTAGE': 13062,
-                                                     'GATEBCURRENT': 13062},
+                                                     'GATEACURRENT': 13064,
+                                                     'GATEBVOLTAGE': 13065,
+                                                     'GATEBCURRENT': 13066},
                                                     {'DRAINVOLTAGE': 13071,
                                                      'DRAINCURRENT': 13072,
                                                      'GATEAVOLTAGE': 13073,
-                                                     'GATEACURRENT': 13072,
-                                                     'GATEBVOLTAGE': 13072,
-                                                     'GATEBCURRENT': 13072}]},
+                                                     'GATEACURRENT': 13074,
+                                                     'GATEBVOLTAGE': 13075,
+                                                     'GATEBCURRENT': 13076}]},
                               'SERVO': {'AXIS1': {'AMPFAULT': 140011,
                                                   'POSLIMIT': 140021,
                                                   'NEGLIMIT': 14031,
@@ -534,12 +534,12 @@ class TestGenerateFrontEndBinary(unittest.TestCase):
 
         # Test RxSelect status bit
         actual = self.data['FEM']['SERVO']['RXSEL']
-        pointer = testDic['RxSel']
+        pointer = testDic['SelectedRx']
         extracted = self.extract(buf, pointer)
         self.assertEqual(extracted, actual)
 
         # -----------------------------------------------------------------
-        # Test Timestamp, Binsize, and Version
+        # Test Timestamp, and Version
         # -----------------------------------------------------------------
         # Timestamp:
         pointer = treeDict['Version']
@@ -550,11 +550,6 @@ class TestGenerateFrontEndBinary(unittest.TestCase):
         pointer = treeDict['Timestamp']
         extracted = self.extract(buf, pointer)
         self.assertEqual(extracted, 500)
-
-        # Binsize:
-        pointer = treeDict['Binsize']
-        extracted = self.extract(buf, pointer)
-        self.assertEqual(extracted, 512)
 
 
 # Main Method

@@ -11,15 +11,23 @@ import struct
 # Description of the GeoBrick device. Currently hard-coded.
 BRICK_HOSTNAME = 'geobrickanta.solar.pvt'
 BRICK_PORT = 1025
-
-# Calibration counts for BRICKCAL method. These are temporary values with
-# no substantial meaning and should be changed as necessary.
-MOTOR3POS_CTS = -2121054
-MOTOR4POS_CTS = -1218574
+BRICK_TIMEOUT = 1
 
 # Program spaces that can be used in the GeoBrick.
-PLC_PROGRAM_SPACE = 10
-PROG_PROGRAM_SPACE = 1
+COMMAND_REGIS = 'P1000='
+ARG1_REGIS = ' P1001='
+ARG2_REGIS = ' P1002='
+
+# Brick command dictionary.
+COMMAND_DICT = {'Home': 1,
+                'SelRx': 2,
+                'SetAngle': 3,
+                'SetZOffset': 4,
+                'SetXOffset': 5,
+                'Kill': 6,
+                'Enable': 7,
+                'SetX': 8,
+                'SetZ': 9}
 
 # Dictionaries for ethernet packets to the Brick.
 RQ_TYPE = {'upload': '\xc0',
@@ -57,7 +65,8 @@ class BrickWorker(i_worker.IWorker):
                          'BRICKOFF',
                          'BRICKLOC',
                          'BRICKANGLE',
-                         'BRICKRESET']
+                         'BRICKRESET',
+                         'RXSELECT']
         self.brick_socket = None
         self.brick_ip = socket.gethostbyname(BRICK_HOSTNAME)
         self.name = 'GeoBrick-Worker'
@@ -124,45 +133,7 @@ class BrickWorker(i_worker.IWorker):
         # Build homing procedure and execute commands.
         command_packets = []
 
-        command = 'CLOSE ALL \r'
-        command += 'OPEN PLC ' + str(PLC_PROGRAM_SPACE) + '\r'
-        command += 'CLEAR \r'
-        command += 'CMD "#1J/" \r'
-        command += 'CMD "#3J/" \r'
-        command += 'CMD "#4J/" \r'
-        command += 'CMD "#3J+" \r'
-        command += 'CMD "#4J+" \r'
-        command += 'WHILE (M331=0 OR M431=0)\r'
-        command += 'WAIT\r'
-        command += 'ENDWHILE\r'
-        command_packets.append(command)
-
-        command = 'CMD "#1J/" \r'
-        command += 'CMD "#3J/" \r'
-        command += 'CMD "#4J/" \r'
-        command += 'CMD "#3$*" \r'
-        command += 'CMD "#4$*" \r'
-        command += 'CMD "#3J/" \r'
-        command += 'CMD "#4J/" \r'
-        command += 'CMD "#3J=' + str(MOTOR3POS_CTS) + '" \r'
-        command += 'CMD "#4J=' + str(MOTOR4POS_CTS) + '" \r'
-        command += 'WHILE (M340=0 OR M440=0)\r'
-        command += 'WAIT\r'
-        command += 'ENDWHILE\r'
-        command_packets.append(command)
-
-        command = 'CMD "#1$*" \r'
-        command += 'CMD "#3$*" \r'
-        command += 'CMD "#4$*" \r'
-        command += 'CMD "#1J/" \r'
-        command += 'CMD "#3J/" \r'
-        command += 'CMD "#4J/" \r'
-        command += 'CMD "DISABLE PLC ' + str(PLC_PROGRAM_SPACE) + '" \r'
-        command += 'CLOSE \r'
-        command += 'ENABLE PLC ' + str(PLC_PROGRAM_SPACE)
-        command_packets.append(command)
-
-        command = 'CLOSE ALL'
+        command = COMMAND_REGIS + str(COMMAND_DICT['Home'])
         command_packets.append(command)
 
         return command_packets, \
@@ -201,27 +172,27 @@ class BrickWorker(i_worker.IWorker):
         except ValueError:
             self.logger('Invalid call to BRICKMOVE.')
             return None
-        if motor_num not in COORDINATE.keys():
+
+        command = None
+        if motor_num == 1:
+            command = COMMAND_REGIS + str(COMMAND_DICT['SetZ']) + \
+                      ARG1_REGIS + str(position)
+
+        elif motor_num == 3:
+            command = COMMAND_REGIS + str(COMMAND_DICT['SetAngle']) + \
+                      ARG1_REGIS + str(position)
+
+        elif motor_num == 4:
+            command = COMMAND_REGIS + str(COMMAND_DICT['SetX']) + \
+                      ARG1_REGIS + str(position)
+
+        else:
             self.logger('Invalid call to BRICKMOVE.')
             return None
 
         # Build command based on parameters. (This assumes that the
         # position given is in physical units.)
-        command_packets = []
-
-        command = 'CLOSE ALL \r'
-        command += '#1J/ \r'
-        command += '#3J/ \r'
-        command += '#4J/ \r'
-        command += '&'
-        command += str(motor_num)
-        command += '!'
-        command += COORDINATE[motor_num]
-        command += str(position)
-        command_packets.append(command)
-
-        command = 'CLOSE ALL'
-        command_packets.append(command)
+        command_packets = [command]
 
         return command_packets, \
                self.__make_brick_command('download', 'getresponse',
@@ -259,37 +230,23 @@ class BrickWorker(i_worker.IWorker):
         except ValueError:
             self.logger('Invalid call to BRICKOFF.')
             return None
-        if motor_num not in COORDINATE.keys():
+
+        command = None
+        if motor_num == 1:
+            command = COMMAND_REGIS + str(COMMAND_DICT['SetZOffset']) + \
+                      ARG1_REGIS + str(offset)
+
+        elif motor_num == 4:
+            command = COMMAND_REGIS + str(COMMAND_DICT['SetXOffset']) + \
+                      ARG1_REGIS + str(offset)
+
+        else:
             self.logger('Invalid call to BRICKOFF.')
             return None
 
-        # Build offset procedure into a program and execute.
-        command_packets = []
-
-        command = 'CLOSE ALL \r'
-        command += '#1J/ \r'
-        command += '#3J/ \r'
-        command += '#4J/ \r'
-        command += 'OPEN PROG ' + str(PROG_PROGRAM_SPACE) + '\r'
-        command += 'CLEAR \r'
-        command += 'INC \r'
-        command += COORDINATE[motor_num] + str(offset) + '\r'
-        command += 'CLOSE \r'
-        command_packets.append(command)
-
-        command = 'OPEN PLC ' + str(PLC_PROGRAM_SPACE) + '\r'
-        command += 'CLEAR \r'
-        command += 'ADDRESS &' + str(motor_num) + '#' + str(motor_num)
-        command += 'CMD "B' + str(PROG_PROGRAM_SPACE) + 'R" \r'
-        command += 'WHILE (M' + str(motor_num) + '40=0)\r'
-        command += 'WAIT\r'
-        command += 'ENDWHILE\r'
-        command_packets.append(command)
-
-        command = 'CMD "DISABLE PLC ' + str(PLC_PROGRAM_SPACE) + '" \r'
-        command += 'CLOSE ALL'
-        command += 'ENABLE PLC' + str(PLC_PROGRAM_SPACE)
-        command_packets.append(command)
+        # Build command based on parameters. (This assumes that the
+        # position given is in physical units.)
+        command_packets = [command]
 
         return command_packets, \
                self.__make_brick_command('download', 'getresponse',
@@ -299,15 +256,13 @@ class BrickWorker(i_worker.IWorker):
     """
     Method: __brick_halt
         Description:
-            Routine to kill a motor and reset it so that it can be moved
-            again as necessary. This does not immediately stop the motors,
-            rather it brakes them and resets them. Do NOT use this method on
-            its own. (Also, note that repeated use of this command can wear
-            down the brakes system and should only be used when necessary.)
+            Routine to kill all motors and reset them so that it can be moved
+            again as necessary. Do NOT use this method on its own. (Also, note
+            that repeated use of this command can wear down the brakes system
+            and should only be used when necessary.)
         Arguments:
             acc_command: list of strings sent from the ACC. List format:
-                ['BRICKHALT', motor_number] where motor_number is self
-                explanatory.
+                ['BRICKHALT'].
         Returns:
             [0]: A list of packets as strings before compression.
             [1]: A list of TCP/Ethernet packets ready to be sent to the Brick.
@@ -315,29 +270,13 @@ class BrickWorker(i_worker.IWorker):
     #endregion
     def __brick_halt(self, acc_command):
         # Error check that the command given is formatted correctly.
-        if len(acc_command) != 2:
-            self.logger('Invalid call to BRICKHALT.')
-            return None
-        motor_num = None
-        try:
-            motor_num = int(acc_command[1])
-        except ValueError:
-            self.logger('Invalid call to BRICKHALT.')
-            return None
-        if motor_num not in COORDINATE.keys():
+        if len(acc_command) != 1:
             self.logger('Invalid call to BRICKHALT.')
             return None
 
-        # Build command based on parameters.
-        command_packets = []
-
-        command = 'CLOSE ALL \r'
-        command += '#' + str(motor_num) + 'K \r'
-        command += '#' + str(motor_num) + 'J/'
-        command_packets.append(command)
-
-        command = 'CLOSE ALL'
-        command_packets.append(command)
+        command = COMMAND_REGIS + str(COMMAND_DICT['Kill']) + '\r' + \
+                  COMMAND_REGIS + str(COMMAND_DICT['Enable'])
+        command_packets = [command]
 
         return command_packets, \
                self.__make_brick_command('download', 'getresponse',
@@ -378,31 +317,16 @@ class BrickWorker(i_worker.IWorker):
             self.logger('Invalid call to BRICKLOC.')
             return None
 
-        # Build command based on parameters. (This assumes that the
-        # position given is in physical units.)
-        command_packets = []
+        command1 = COMMAND_REGIS + str(COMMAND_DICT['SetZ']) + \
+                   ARG1_REGIS + str(position1)
 
-        command = 'CLOSE ALL \r'
-        command += '#1J/ \r #3J/ \r #4J/'
-        command += '&'
-        command += str(1)
-        command += '!'
-        command += COORDINATE[1]
-        command += str(position1)
-        command += '&'
-        command += str(3)
-        command += '!'
-        command += COORDINATE[3]
-        command += str(position3)
-        command += '&'
-        command += str(4)
-        command += '!'
-        command += COORDINATE[4]
-        command += str(position4)
-        command_packets.append(command)
+        command2 = COMMAND_REGIS + str(COMMAND_DICT['SetAngle']) + \
+                   ARG1_REGIS + str(position3)
 
-        command = 'CLOSE ALL'
-        command_packets.append(command)
+        command3 = COMMAND_REGIS + str(COMMAND_DICT['SetX']) + \
+                   ARG1_REGIS + str(position4)
+
+        command_packets = [command1, command2, command3]
 
         return command_packets, \
                self.__make_brick_command('download', 'getresponse',
@@ -429,8 +353,7 @@ class BrickWorker(i_worker.IWorker):
         if len(acc_command) != 2:
             self.logger('Invalid call to BRICKANGLE.')
             return None
-        motor_num = None
-        position = None
+        angle = None
         try:
             angle = int(acc_command[1])
         except ValueError:
@@ -438,22 +361,51 @@ class BrickWorker(i_worker.IWorker):
             return None
 
         # Build command based on parameters.
-        command_packets = []
+        command = COMMAND_REGIS + str(COMMAND_DICT['SetAngle']) + \
+                  ARG1_REGIS + str(angle)
+        command_packets = [command]
 
-        command = 'CLOSE ALL \r'
-        command += '#3J/ \r'
-        command += '&'
-        command += str(3)
-        command += '!'
-        command += COORDINATE[3]
-        command += str(angle)
-        command_packets.append(command)
+        return command_packets, self.__make_brick_command('download',
+                                                          'getresponse',
+                                                          0, 0,
+                                                          command_packets)
 
-        command = 'CLOSE ALL'
-        command_packets.append(command)
+    #region Method Description
+    """
+    Method: __rx_select
+        Description:
+            Routine to select one of two receivers on the antenna
+        Arguments:
+            acc_command: list of strings sent from the ACC. List format:
+                ['RXSELECT', rx] where rx is 1 for low-nu and 2 for high-nu.
+        Returns:
+            [0]: A list of packets as strings before compression.
+            [1]: A list of TCP/Ethernet packets ready to be sent to the Brick.
+    """
+    #endregion
+    def __rx_select(self, acc_command):
+        # Error check that the command given is formatted correctly.
+        if len(acc_command) != 2:
+            self.logger('Invalid call to RXSELECT.')
+            return None
+        rx = None
+        try:
+            rx = int(acc_command[1])
+            if rx not in [1, 2]:
+                raise ValueError('Invalid RX selection.')
+        except ValueError:
+            self.logger('Invalid call to RXSELECT.')
+            return None
 
-        return command_packets, self.__make_brick_command('download', 'getresponse',
-                                            0, 0, command_packets)
+        # Build command based on parameters.
+        command = COMMAND_REGIS + str(COMMAND_DICT['SelRx']) + \
+                  ARG1_REGIS + str(rx)
+        command_packets = [command]
+
+        return command_packets, self.__make_brick_command('download',
+                                                          'getresponse',
+                                                          0, 0,
+                                                          command_packets)
 
     #region Method Description
     """
@@ -504,7 +456,8 @@ class BrickWorker(i_worker.IWorker):
                     'BRICKHALT': __brick_halt,
                     'BRICKLOC' : __brick_loc,
                     'BRICKANGLE': __brick_angle,
-                    'BRICKRESET': __brick_reset}
+                    'BRICKRESET': __brick_reset,
+                    'RXSELECT': __rx_select}
 
     # ---------------------------------------------------------------
     # STATEFRAME HELPERS
@@ -512,7 +465,7 @@ class BrickWorker(i_worker.IWorker):
     def __brickmonitor_query(self, command):
         query_socket = socket.socket(socket.AF_INET,
                                      socket.SOCK_STREAM)
-        query_socket.settimeout(1.5)
+        query_socket.settimeout(BRICK_TIMEOUT)
         query_socket.connect((self.brick_ip, BRICK_PORT))
         cmd_string = [command]
         cmd = self.__make_brick_command('download', 'getresponse',
@@ -567,7 +520,7 @@ class BrickWorker(i_worker.IWorker):
                                               socket.SOCK_STREAM)
                     self.brick_socket.connect((self.brick_ip, BRICK_PORT))
                     self.brick_socket.sendall(packet)
-                    self.brick_socket.settimeout(1.5)
+                    self.brick_socket.settimeout(BRICK_TIMEOUT)
                     reply = self.brick_socket.recv(1024)
 
                     self.logger('Reply from brick: ' + reply)
