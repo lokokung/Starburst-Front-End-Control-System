@@ -191,17 +191,19 @@ class ServerDaemon():
         return {'FEM': fem_dict}
 
     def send_stateframe_dict(self):
-        fem_dict = self.make_stateframe_dict()
-        fmt, buf, xml = gen_fem_sf.gen_fem_sf(fem_dict)
-        packet_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        packet_socket.settimeout(0.3)
-        packet_socket.connect((self.acc_ip, ACC_PORT))
-        packet_socket.sendall(buf)
-        packet_socket.close()
-        # persec = open('/tmp/persec.txt', 'a')
-        # persec.write(buf + '\n')
-        # persec.close()
-        threading.Timer(0.3, self.send_stateframe_dict).start()
+        try:
+            fem_dict = self.make_stateframe_dict()
+            fmt, buf, xml = gen_fem_sf.gen_fem_sf(fem_dict)
+            packet_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            packet_socket.settimeout(0.3)
+            packet_socket.connect((self.acc_ip, ACC_PORT))
+            packet_socket.sendall(buf)
+            packet_socket.close()
+            # persec = open('/tmp/persec.txt', 'a')
+            # persec.write(buf + '\n')
+            # persec.close()
+        finally:
+            threading.Timer(0.3, self.send_stateframe_dict).start()
 
 
     # region Method Description

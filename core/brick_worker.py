@@ -11,7 +11,7 @@ import struct
 # Description of the GeoBrick device. Currently hard-coded.
 BRICK_HOSTNAME = 'geobrickanta.solar.pvt'
 BRICK_PORT = 1025
-BRICK_TIMEOUT = 1
+BRICK_TIMEOUT = 0.5
 
 # Program spaces that can be used in the GeoBrick.
 COMMAND_REGIS = 'P1000='
@@ -59,7 +59,9 @@ MPADDRESSSTART = 900
 class BrickWorker(i_worker.IWorker):
     def __init__(self):
         super(BrickWorker, self).__init__()
-        self.commands = ['BRICKCAL',
+        self.commands = ['FRM-HOME',
+                         'FRM-RX-SEL'
+                         'FRM-KILL',
                          'BRICKHALT',
                          'BRICKMOVE',
                          'BRICKOFF',
@@ -107,30 +109,24 @@ class BrickWorker(i_worker.IWorker):
 
     #region Method Description
     """
-    Method: __brick_cal
+    Method: __frm_home
         Description:
-            Routine to build custom homing PLC program on Brick and
-            execute. This method is dependent on the values PLC_PROGRAM_SPACE,
-            MOTOR3POS_CTS, and MOTOR4POS_CTS. PLC_PROGRAM_SPACE dictates where
-            to save the PLC program on the Brick while the MOTORPOS values
-            dictate how far from the positive end for the apparatus to move
-            in motor counts before zero-ing for calibration. Do NOT use this
+            Runs homing procedure local to the GeoBrick. Do NOT use this
             method on its own. This method is error checked before execution.
         Arguments:
             acc_command: list of the strings sent from the ACC. List format:
-                ['BRICKCAL']
+                ['FRM-HOME']
         Returns:
             [0]: A list of packets as strings before compression.
             [1]: A list of TCP/Ethernet packets ready to be sent to the Brick.
     """
     #endregion
-    def __brick_cal(self, acc_command):
+    def __frm_home(self, acc_command):
         # Error check that the command given is formatted correctly.
         if len(acc_command) != 1:
-            self.logger('Invalid call to BRICKCAL.')
+            self.logger('Invalid call to FRM-HOME.')
             return None
 
-        # Build homing procedure and execute commands.
         command_packets = []
 
         command = COMMAND_REGIS + str(COMMAND_DICT['Home'])
@@ -142,251 +138,21 @@ class BrickWorker(i_worker.IWorker):
 
     #region Method Description
     """
-    Method: __brick_move
-        Description:
-            Routine to move designated motor to an absolute position
-            defined by the conversion factors to physical units. This
-            routine should only be called after a BRICKCAL command has
-            been issued. Do NOT use this method on its own.
-        Arguments:
-            acc_command: list of strings sent from the ACC. List format:
-                ['BRICKMOVE', motor_number, destination] where motor_number
-                is the motor to be moved and destination is the destination
-                in physical units. For motor 1 and 4 the units are mm and
-                for motor 3 the units are degrees.
-        Returns:
-            [0]: A list of packets as strings before compression.
-            [1]: A list of TCP/Ethernet packets ready to be sent to the Brick.
-    """
-    #endregion
-    def __brick_move(self, acc_command):
-        # Error check that the command given is formatted correctly.
-        if len(acc_command) != 3:
-            self.logger('Invalid call to BRICKMOVE.')
-            return None
-        motor_num = None
-        position = None
-        try:
-            motor_num = int(acc_command[1])
-            position = float(acc_command[2])
-        except ValueError:
-            self.logger('Invalid call to BRICKMOVE.')
-            return None
-
-        command = None
-        if motor_num == 1:
-            command = COMMAND_REGIS + str(COMMAND_DICT['SetZ']) + \
-                      ARG1_REGIS + str(position)
-
-        elif motor_num == 3:
-            command = COMMAND_REGIS + str(COMMAND_DICT['SetAngle']) + \
-                      ARG1_REGIS + str(position)
-
-        elif motor_num == 4:
-            command = COMMAND_REGIS + str(COMMAND_DICT['SetX']) + \
-                      ARG1_REGIS + str(position)
-
-        else:
-            self.logger('Invalid call to BRICKMOVE.')
-            return None
-
-        # Build command based on parameters. (This assumes that the
-        # position given is in physical units.)
-        command_packets = [command]
-
-        return command_packets, \
-               self.__make_brick_command('download', 'getresponse',
-                                         0, 0, command_packets)
-
-    #region Method Description
-    """
-    Method: __brick_off
-        Description:
-            Routine to move designated motor an offset of some value in
-            physical units. This routine should only be called after a
-            BRICKCAL command has been issued. Do NOT use this method on
-            its own.
-        Arguments:
-            acc_command: list of strings sent from the ACC. List format:
-                ['BRICKMOVE', motor_number, offset] where motor_number
-                is the motor to be moved and offset is the offset
-                in physical units. For motor 1 and 4 the units are mm and
-                for motor 3 the units are degrees.
-        Returns:
-            [0]: A list of packets as strings before compression.
-            [1]: A list of TCP/Ethernet packets ready to be sent to the Brick.
-    """
-    #endregion
-    def __brick_off(self, acc_command):
-        # Error check that the command given is formatted correctly.
-        if len(acc_command) != 3:
-            self.logger('Invalid call to BRICKOFF.')
-            return None
-        motor_num = None
-        offset = None
-        try:
-            motor_num = int(acc_command[1])
-            offset = float(acc_command[2])
-        except ValueError:
-            self.logger('Invalid call to BRICKOFF.')
-            return None
-
-        command = None
-        if motor_num == 1:
-            command = COMMAND_REGIS + str(COMMAND_DICT['SetZOffset']) + \
-                      ARG1_REGIS + str(offset)
-
-        elif motor_num == 4:
-            command = COMMAND_REGIS + str(COMMAND_DICT['SetXOffset']) + \
-                      ARG1_REGIS + str(offset)
-
-        else:
-            self.logger('Invalid call to BRICKOFF.')
-            return None
-
-        # Build command based on parameters. (This assumes that the
-        # position given is in physical units.)
-        command_packets = [command]
-
-        return command_packets, \
-               self.__make_brick_command('download', 'getresponse',
-                                         0, 0, command_packets)
-
-    #region Method Description
-    """
-    Method: __brick_halt
-        Description:
-            Routine to kill all motors and reset them so that it can be moved
-            again as necessary. Do NOT use this method on its own. (Also, note
-            that repeated use of this command can wear down the brakes system
-            and should only be used when necessary.)
-        Arguments:
-            acc_command: list of strings sent from the ACC. List format:
-                ['BRICKHALT'].
-        Returns:
-            [0]: A list of packets as strings before compression.
-            [1]: A list of TCP/Ethernet packets ready to be sent to the Brick.
-    """
-    #endregion
-    def __brick_halt(self, acc_command):
-        # Error check that the command given is formatted correctly.
-        if len(acc_command) != 1:
-            self.logger('Invalid call to BRICKHALT.')
-            return None
-
-        command = COMMAND_REGIS + str(COMMAND_DICT['Kill']) + '\r' + \
-                  COMMAND_REGIS + str(COMMAND_DICT['Enable'])
-        command_packets = [command]
-
-        return command_packets, \
-               self.__make_brick_command('download', 'getresponse',
-                                         0, 0, command_packets)
-
-    #region Method Description
-    """
-    Method: __brick_loc
-        Description:
-            Routine to move all motors to a designated coordinate defined
-            in absolute physical units. This routine should only be called
-            after a BRICKCAL command has been issued. Do NOT use this method
-            on its own.
-        Arguments:
-            acc_command: list of strings sent from the ACC. List format:
-                ['BRICKLOC', motor1_pos, motor3_pos, motor4_pos] where the
-                motor_pos values are the absolute locations for the three
-                motors. Note that motor 1 and 4 are in mm and motor 3 is in
-                degrees.
-        Returns:
-            [0]: A list of packets as strings before compression.
-            [1]: A list of TCP/Ethernet packets ready to be sent to the Brick.
-    """
-    #endregion
-    def __brick_loc(self, acc_command):
-        # Error check that the command given is formatted correctly.
-        if len(acc_command) != 4:
-            self.logger('Invalid call to BRICKLOC.')
-            return None
-        position1 = None
-        position3 = None
-        position4 = None
-        try:
-            position1 = float(acc_command[1])
-            position3 = float(acc_command[2])
-            position4 = float(acc_command[3])
-        except ValueError:
-            self.logger('Invalid call to BRICKLOC.')
-            return None
-
-        command1 = COMMAND_REGIS + str(COMMAND_DICT['SetZ']) + \
-                   ARG1_REGIS + str(position1)
-
-        command2 = COMMAND_REGIS + str(COMMAND_DICT['SetAngle']) + \
-                   ARG1_REGIS + str(position3)
-
-        command3 = COMMAND_REGIS + str(COMMAND_DICT['SetX']) + \
-                   ARG1_REGIS + str(position4)
-
-        command_packets = [command1, command2, command3]
-
-        return command_packets, \
-               self.__make_brick_command('download', 'getresponse',
-                                         0, 0, command_packets)
-
-    #region Method Description
-    """
-    Method: __brick_angle
-        Description:
-            Routine to move motor 3 to a given angle. This routine should only
-            be called after a BRICKCAL command has been issued. Do NOT use
-            this method on its own.
-        Arguments:
-            acc_command: list of strings sent from the ACC. List format:
-                ['BRICKANGLE', angle] where angle is the absolute angle to be
-                set.
-        Returns:
-            [0]: A list of packets as strings before compression.
-            [1]: A list of TCP/Ethernet packets ready to be sent to the Brick.
-    """
-    #endregion
-    def __brick_angle(self, acc_command):
-        # Error check that the command given is formatted correctly.
-        if len(acc_command) != 2:
-            self.logger('Invalid call to BRICKANGLE.')
-            return None
-        angle = None
-        try:
-            angle = int(acc_command[1])
-        except ValueError:
-            self.logger('Invalid call to BRICKANGLE.')
-            return None
-
-        # Build command based on parameters.
-        command = COMMAND_REGIS + str(COMMAND_DICT['SetAngle']) + \
-                  ARG1_REGIS + str(angle)
-        command_packets = [command]
-
-        return command_packets, self.__make_brick_command('download',
-                                                          'getresponse',
-                                                          0, 0,
-                                                          command_packets)
-
-    #region Method Description
-    """
-    Method: __rx_select
+    Method: __frm_rx_sel
         Description:
             Routine to select one of two receivers on the antenna
         Arguments:
             acc_command: list of strings sent from the ACC. List format:
-                ['RXSELECT', rx] where rx is 1 for low-nu and 2 for high-nu.
+                ['FRM-RX-SEL', rx] where rx is 1 for low-nu and 2 for high-nu.
         Returns:
             [0]: A list of packets as strings before compression.
             [1]: A list of TCP/Ethernet packets ready to be sent to the Brick.
     """
     #endregion
-    def __rx_select(self, acc_command):
+    def __frm_rx_sel(self, acc_command):
         # Error check that the command given is formatted correctly.
         if len(acc_command) != 2:
-            self.logger('Invalid call to RXSELECT.')
+            self.logger('Invalid call to FRM-RX-SEL.')
             return None
         rx = None
         try:
@@ -394,7 +160,7 @@ class BrickWorker(i_worker.IWorker):
             if rx not in [1, 2]:
                 raise ValueError('Invalid RX selection.')
         except ValueError:
-            self.logger('Invalid call to RXSELECT.')
+            self.logger('Invalid call to FRM-RX-SEL.')
             return None
 
         # Build command based on parameters.
@@ -409,60 +175,212 @@ class BrickWorker(i_worker.IWorker):
 
     #region Method Description
     """
-    Method: __brick_reset
+    Method: __frm_set_pa
         Description:
-            Routine to reset the Brick cleanly. Do NOT use this method on its
-            own.
+            Routine to move motor 3 to a given angle. This routine should only
+            be called after a FRM_HOME command has been issued. Do NOT use
+            this method on its own.
         Arguments:
             acc_command: list of strings sent from the ACC. List format:
-                ['BRICKRESET'].
+                ['FRM-SET-PA', angle] where angle is the absolute angle to be
+                set.
         Returns:
             [0]: A list of packets as strings before compression.
             [1]: A list of TCP/Ethernet packets ready to be sent to the Brick.
     """
     #endregion
-    def __brick_reset(self, acc_command):
+    def __frm_set_pa(self, acc_command):
         # Error check that the command given is formatted correctly.
-        if len(acc_command) != 1:
-            self.logger('Invalid call to BRICKRESET.')
+        if len(acc_command) != 2:
+            self.logger('Invalid call to FRM-SET-PA.')
+            return None
+        angle = None
+        try:
+            angle = int(acc_command[1])
+            if angle > 90 or angle < -90:
+                raise ValueError('Invalid position angle selection.')
+        except ValueError:
+            self.logger('Invalid call to FRM-SET-PA.')
             return None
 
-        # Build homing procedure and execute commands.
-        command_packets = []
+        # Build command based on parameters.
+        command = COMMAND_REGIS + str(COMMAND_DICT['SetAngle']) + \
+                  ARG1_REGIS + str(angle)
+        command_packets = [command]
 
-        command = 'CLOSE ALL \r'
-        command += 'OPEN PROG ' + str(PROG_PROGRAM_SPACE) + '\r'
-        command += 'CLEAR \r'
-        command += 'M6014=0 \r'
-        command += 'DWELL2000 \r'
-        command += 'CMD"$$$" \r'
-        command += 'CLOSE \r'
-        command += 'B' + str(PROG_PROGRAM_SPACE) + 'R'
-        command_packets.append(command)
+        return command_packets, self.__make_brick_command('download',
+                                                          'getresponse',
+                                                          0, 0,
+                                                          command_packets)
 
-        command = 'CLOSE ALL'
-        command_packets.append(command)
+    def __frm_x_offset(self, acc_command):
+        # Error check that the command given is formatted correctly.
+        if len(acc_command) != 2:
+            self.logger('Invalid call to FRM-X-OFFSET.')
+            return None
+        offset = None
+        try:
+            offset = float(acc_command[1])
+        except ValueError:
+            self.logger('Invalid call to FRM-X-OFFSET.')
+            return None
+
+        command = COMMAND_REGIS + str(COMMAND_DICT['SetXOffset']) + \
+                      ARG1_REGIS + str(offset)
+
+        # Build command based on parameters. (This assumes that the
+        # position given is in physical units.)
+        command_packets = [command]
 
         return command_packets, \
                self.__make_brick_command('download', 'getresponse',
                                          0, 0, command_packets)
 
+    def __frm_z_offset(self, acc_command):
+        # Error check that the command given is formatted correctly.
+        if len(acc_command) != 2:
+            self.logger('Invalid call to FRM-Z-OFFSET.')
+            return None
+        offset = None
+        try:
+            offset = float(acc_command[1])
+        except ValueError:
+            self.logger('Invalid call to FRM-Z-OFFSET.')
+            return None
+
+        command = COMMAND_REGIS + str(COMMAND_DICT['SetZOffset']) + \
+                      ARG1_REGIS + str(offset)
+
+        # Build command based on parameters. (This assumes that the
+        # position given is in physical units.)
+        command_packets = [command]
+
+        return command_packets, \
+               self.__make_brick_command('download', 'getresponse',
+                                         0, 0, command_packets)
+
+    #region Method Description
+    """
+    Method: __frm_abs_x
+        Description:
+            Routine to move x-axis to specified location
+        Arguments:
+            acc_command: list of strings sent from the ACC. List format:
+                ['FRM-ABS-X', destination] where destination is the destination
+                in physical units (mm).
+        Returns:
+            [0]: A list of packets as strings before compression.
+            [1]: A list of TCP/Ethernet packets ready to be sent to the Brick.
+    """
+    #endregion
+    def __frm_abs_x(self, acc_command):
+        # Error check that the command given is formatted correctly.
+        if len(acc_command) != 2:
+            self.logger('Invalid call to FRM-ABS-X.')
+            return None
+        position = None
+        try:
+            position = float(acc_command[1])
+        except ValueError:
+            self.logger('Invalid call to FRM-ABS-X.')
+            return None
+
+        command = COMMAND_REGIS + str(COMMAND_DICT['SetX']) + \
+                      ARG1_REGIS + str(position)
+
+        # Build command based on parameters. (This assumes that the
+        # position given is in physical units.)
+        command_packets = [command]
+
+        return command_packets, \
+               self.__make_brick_command('download', 'getresponse',
+                                         0, 0, command_packets)
+
+    #region Method Description
+    """
+    Method: __frm_abs_z
+        Description:
+            Routine to move z-axis to specified location
+        Arguments:
+            acc_command: list of strings sent from the ACC. List format:
+                ['FRM-ABS-Z', destination] where destination is the destination
+                in physical units (mm).
+        Returns:
+            [0]: A list of packets as strings before compression.
+            [1]: A list of TCP/Ethernet packets ready to be sent to the Brick.
+    """
+    #endregion
+    def __frm_abs_z(self, acc_command):
+        # Error check that the command given is formatted correctly.
+        if len(acc_command) != 2:
+            self.logger('Invalid call to FRM-ABS-Z.')
+            return None
+        position = None
+        try:
+            position = float(acc_command[1])
+        except ValueError:
+            self.logger('Invalid call to FRM-ABS-Z.')
+            return None
+
+        command = COMMAND_REGIS + str(COMMAND_DICT['SetZ']) + \
+                      ARG1_REGIS + str(position)
+
+        # Build command based on parameters. (This assumes that the
+        # position given is in physical units.)
+        command_packets = [command]
+
+        return command_packets, \
+               self.__make_brick_command('download', 'getresponse',
+                                         0, 0, command_packets)
+
+    def __frm_kill(self, acc_command):
+        # Error check that the command given was formatted correctly.
+        if len(acc_command) != 1:
+            self.logger('Invalid call to FRM-KILL')
+            return None
+
+        command_packets = []
+
+        command = COMMAND_REGIS + str(COMMAND_DICT['Kill'])
+        command_packets.append(command)
+
+        return command_packets, \
+               self.__make_brick_command('download', 'getresponse',
+                                        0, 0, command_packets)
+
+    def __frm_enable(self, acc_command):
+        # Error check that the command given was formatted correctly.
+        if len(acc_command) != 1:
+            self.logger('Invalid call to FRM-ENABLE')
+            return None
+
+        command_packets = []
+
+        command = COMMAND_REGIS + str(COMMAND_DICT['Enable'])
+        command_packets.append(command)
+
+        return command_packets, \
+               self.__make_brick_command('download', 'getresponse',
+                                        0, 0, command_packets)
+
     # ---------------------------------------------------------------
     # FUNCTION MAP
     # ---------------------------------------------------------------
-    function_map = {'BRICKCAL': __brick_cal,
-                    'BRICKMOVE': __brick_move,
-                    'BRICKOFF': __brick_off,
-                    'BRICKHALT': __brick_halt,
-                    'BRICKLOC' : __brick_loc,
-                    'BRICKANGLE': __brick_angle,
-                    'BRICKRESET': __brick_reset,
-                    'RXSELECT': __rx_select}
+    function_map = {'FRM-HOME': __frm_home,
+                    'FRM-KILL': __frm_kill,
+                    'FRM-RX-SEL': __frm_rx_sel,
+                    'FRM-SET-PA': __frm_set_pa,
+                    'FRM-X-OFFSET': __frm_x_offset,
+                    'FRM-Z-OFFSET': __frm_z_offset,
+                    'FRM-ABS-X': __frm_abs_x,
+                    'FRM-ABS-Z': __frm_abs_z,
+                    'FRM-ENABLE': __frm_enable}
 
     # ---------------------------------------------------------------
     # STATEFRAME HELPERS
     # ---------------------------------------------------------------
-    def __brickmonitor_query(self, command):
+    def __brickmonitor_query(self):
+        command = 'LIST GATHER'
         query_socket = socket.socket(socket.AF_INET,
                                      socket.SOCK_STREAM)
         query_socket.settimeout(BRICK_TIMEOUT)
@@ -472,11 +390,18 @@ class BrickWorker(i_worker.IWorker):
                                         0, 0, cmd_string)
         query_socket.sendall(cmd[0])
         response = query_socket.recv(1024)
-        response = response[:-2]
-
         query_socket.close()
+        response = response.replace('\r', ' ')
+        response = response.split(' ')
+        parsed_response = []
+        for monitor_point in response:
+            parsed_response.append(self.__str2float(monitor_point))
 
-        return response
+        return parsed_response
+
+    def __str2float(self, str_val):
+        num = int(str_val, 16)
+        return (num >> 12) * 2**((num & 0xFFF) - 2082)
 
     # ---------------------------------------------------------------
     # INTERFACE IMPLEMENTATIONS
@@ -543,55 +468,56 @@ class BrickWorker(i_worker.IWorker):
         stateframe_data = {'AXIS1': {},
                            'AXIS3': {},
                            'AXIS4': {}}
+        fetched_data = self.__brickmonitor_query()
 
         stateframe_data['HOMED'] = \
-            int(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 1)))
+            int(fetched_data[1])
         stateframe_data['RXSEL'] = \
-            int(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 2)))
+            int(fetched_data[2])
 
         stateframe_data['AXIS1']['P'] = \
-            float(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 3)))
+            float(fetched_data[3])
         stateframe_data['AXIS1']['PERR'] = \
-            float(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 4)))
+            float(fetched_data[4])
         stateframe_data['AXIS1']['POFF'] = \
-            float(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 5)))
+            float(fetched_data[5])
         stateframe_data['AXIS1']['I'] = \
-            float(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 6)))
+            float(fetched_data[6])
         stateframe_data['AXIS1']['POSLIMIT'] = \
-            int(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 7)))
+            int(fetched_data[7])
         stateframe_data['AXIS1']['NEGLIMIT'] = \
-            int(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 8)))
+            int(fetched_data[8])
         stateframe_data['AXIS1']['AMPFAULT'] = \
-            int(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 9)))
+            int(fetched_data[9])
 
         stateframe_data['AXIS3']['P'] = \
-            float(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 10)))
+            float(fetched_data[10])
         stateframe_data['AXIS3']['PERR'] = \
-            float(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 11)))
+            float(fetched_data[11])
         stateframe_data['AXIS3']['POFF'] = \
-            float(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 12)))
+            float(fetched_data[12])
         stateframe_data['AXIS3']['I'] = \
-            float(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 13)))
+            float(fetched_data[13])
         stateframe_data['AXIS3']['POSLIMIT'] = \
-            int(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 14)))
+            int(fetched_data[14])
         stateframe_data['AXIS3']['NEGLIMIT'] = \
-            int(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 15)))
+            int(fetched_data[15])
         stateframe_data['AXIS3']['AMPFAULT'] = \
-            int(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 16)))
+            int(fetched_data[16])
 
         stateframe_data['AXIS4']['P'] = \
-            float(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 17)))
+            float(fetched_data[17])
         stateframe_data['AXIS4']['PERR'] = \
-            float(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 18)))
+            float(fetched_data[18])
         stateframe_data['AXIS4']['POFF'] = \
-            float(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 19)))
+            float(fetched_data[19])
         stateframe_data['AXIS4']['I'] = \
-            float(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 20)))
+            float(fetched_data[20])
         stateframe_data['AXIS4']['POSLIMIT'] = \
-            int(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 21)))
+            int(fetched_data[21])
         stateframe_data['AXIS4']['NEGLIMIT'] = \
-            int(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 22)))
+            int(fetched_data[22])
         stateframe_data['AXIS4']['AMPFAULT'] = \
-            int(self.__brickmonitor_query('P' + str(MPADDRESSSTART + 23)))
+            int(fetched_data[23])
 
         return stateframe_data

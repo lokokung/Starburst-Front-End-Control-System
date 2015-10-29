@@ -44,21 +44,21 @@ class BBWorker(i_worker.IWorker):
 
     # region Method Description
     """
-    Method: __lnagatea
+    Method: __lna_gate1
         Description:
             Routine to build command to change voltage on the LNA
             Gate A.
         Arguments:
             acc_command: list of the strings sent from the ACC. List format:
-                ['LNAGATEA', amp_number, voltage]
+                ['LNA-GATE1', amp_number, voltage]
         Returns:
             command: command designated to complete task.
     """
     # endregion
-    def __lnagatea(self, acc_command):
+    def __lna_gate1(self, acc_command):
         # Error check that the command given is formatted correctly.
         if len(acc_command) != 3:
-            self.logger('Invalid call to LNAGATEA.')
+            self.logger('Invalid call to LNA-GATE1.')
             return None
         amp_num = None
         voltage = None
@@ -67,10 +67,10 @@ class BBWorker(i_worker.IWorker):
             voltage = float(acc_command[2])
             voltage /= GATE_FACTOR
         except ValueError:
-            self.logger('Invalid call to LNAGATEA.')
+            self.logger('Invalid call to LNA-GATE1.')
             return None
         if amp_num < 0 or amp_num > 3:
-            self.logger('Invalid call to LNAGATEA.')
+            self.logger('Invalid call to LNA-GATE1.')
             return None
 
         # Given that the parameters are all reasonable, we return the
@@ -81,21 +81,21 @@ class BBWorker(i_worker.IWorker):
 
     # region Method Description
     """
-    Method: __lnagateb
+    Method: __lna_gate2
         Description:
             Routine to build command to change voltage on the LNA
             Gate B.
         Arguments:
             acc_command: list of the strings sent from the ACC. List format:
-                ['LNAGATEB', amp_number, voltage]
+                ['LNA-GATE2', amp_number, voltage]
         Returns:
             command: command designated to complete task.
     """
     # endregion
-    def __lnagateb(self, acc_command):
+    def __lna_gate2(self, acc_command):
         # Error check that the command given is formatted correctly.
         if len(acc_command) != 3:
-            self.logger('Invalid call to LNAGATEB.')
+            self.logger('Invalid call to LNA-GATE2.')
             return None
         amp_num = None
         voltage = None
@@ -104,10 +104,10 @@ class BBWorker(i_worker.IWorker):
             voltage = float(acc_command[2])
             voltage /= GATE_FACTOR
         except ValueError:
-            self.logger('Invalid call to LNAGATEB.')
+            self.logger('Invalid call to LNA-GATE2.')
             return None
         if amp_num < 0 or amp_num > 3:
-            self.logger('Invalid call to LNAGATEB.')
+            self.logger('Invalid call to LNA-GATE2.')
             return None
 
         # Given that the parameters are all reasonable, we return the
@@ -118,20 +118,20 @@ class BBWorker(i_worker.IWorker):
 
     # region Method Description
     """
-    Method: __lnadrain
+    Method: __lna_drain
         Description:
             Routine to build command to change voltage on the LNA drain.
         Arguments:
             acc_command: list of the strings sent from the ACC. List format:
-                ['LNADRAIN', amp_number, voltage]
+                ['LNA-DRAIN', amp_number, voltage]
         Returns:
             command: command designated to complete task.
     """
     # endregion
-    def __lnadrain(self, acc_command):
+    def __lna_drain(self, acc_command):
         # Error check that the command given is formatted correctly.
         if len(acc_command) != 3:
-            self.logger('Invalid call to LNADRAIN.')
+            self.logger('Invalid call to LNA-DRAIN.')
             return None
         amp_num = None
         voltage = None
@@ -140,10 +140,10 @@ class BBWorker(i_worker.IWorker):
             voltage = float(acc_command[2])
             voltage /= DRAIN_FACTOR
         except ValueError:
-            self.logger('Invalid call to LNADRAIN.')
+            self.logger('Invalid call to LNA-DRAIN.')
             return None
         if amp_num < 0 or amp_num > 3:
-            self.logger('Invalid call to LNADRAIN.')
+            self.logger('Invalid call to LNA-DRAIN.')
             return None
 
         # Given that the parameters are all reasonable, we return the
@@ -154,20 +154,20 @@ class BBWorker(i_worker.IWorker):
 
     # region Method Description
     """
-    Method: __lnabias
+    Method: __lna_enable
         Description:
-            Routine to latch changed to the LNA.
+            Routine to set power to LNA.
         Arguments:
             acc_command: list of the strings sent from the ACC. List format:
-                ['LNABIAS', amp_number, positive_value_to_latch]
+                ['LNA-ENABLE', amp_number, state]
         Returns:
             command: command designated to complete task.
     """
     # endregion
-    def __lnabias(self, acc_command):
+    def __lna_enable(self, acc_command):
         # Error check that the command given is formatted correctly.
         if len(acc_command) != 3:
-            self.logger('Invalid call to LNABIAS.')
+            self.logger('Invalid call to LNA-ENABLE.')
             return None
         amp_num = None
         state = None
@@ -175,10 +175,10 @@ class BBWorker(i_worker.IWorker):
             amp_num = int(acc_command[1])
             state = int(acc_command[2])
         except ValueError:
-            self.logger('Invalid call to LNABIAS.')
+            self.logger('Invalid call to LNA-ENABLE.')
             return None
         if amp_num < 0 or amp_num > 3:
-            self.logger('Invalid call to LNABIAS.')
+            self.logger('Invalid call to LNA-ENABLE.')
             return None
         if state != 0 and state != 1:
             return None
@@ -191,10 +191,10 @@ class BBWorker(i_worker.IWorker):
     # ---------------------------------------------------------------
     # FUNCTION MAP
     # ---------------------------------------------------------------
-    function_map = {'LNAGATEA': __lnagatea,
-                    'LNAGATEB': __lnagateb,
-                    'LNADRAIN': __lnadrain,
-                    'LNABIAS': __lnabias}
+    function_map = {'LNA-GATE1': __lna_gate1,
+                    'LNA-GATE2': __lna_gate2,
+                    'LNA-DRAIN': __lna_drain,
+                    'LNA-ENABLE': __lna_enable}
 
     # ---------------------------------------------------------------
     # STATEFRAME HELPERS
