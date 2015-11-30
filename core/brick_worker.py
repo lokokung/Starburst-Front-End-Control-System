@@ -60,15 +60,14 @@ class BrickWorker(i_worker.IWorker):
     def __init__(self):
         super(BrickWorker, self).__init__()
         self.commands = ['FRM-HOME',
-                         'FRM-RX-SEL'
                          'FRM-KILL',
-                         'BRICKHALT',
-                         'BRICKMOVE',
-                         'BRICKOFF',
-                         'BRICKLOC',
-                         'BRICKANGLE',
-                         'BRICKRESET',
-                         'RXSELECT']
+                         'FRM-RX-SEL',
+                         'FRM-SET-PA',
+                         'FRM-X-OFFSET',
+                         'FRM-Z-OFFSET',
+                         'FRM-ABS-X',
+                         'FRM-ABS-Z',
+                         'FRM-ENABLE']
         self.brick_socket = None
         self.brick_ip = socket.gethostbyname(BRICK_HOSTNAME)
         self.name = 'GeoBrick-Worker'
@@ -400,7 +399,11 @@ class BrickWorker(i_worker.IWorker):
         return parsed_response
 
     def __str2float(self, str_val):
-        num = int(str_val, 16)
+        num = 0
+        try:
+            num = int(str_val, 16)
+        except Exception:
+            num = 0
         return (num >> 12) * 2**((num & 0xFFF) - 2082)
 
     # ---------------------------------------------------------------

@@ -95,7 +95,7 @@ class PDUWorker(i_worker.IWorker):
             on the PDU on/off.
         Arguments:
             acc_command: list of the strings sent from the ACC. List format:
-                ['OUTLET', outlet_number, 0=off 1=on]
+                ['OUTLET', outlet_number, 'on' or 'off']
         Returns:
             command: url designated to complete task.
     """
@@ -106,12 +106,11 @@ class PDUWorker(i_worker.IWorker):
             self.logger('Invalid call to OUTLET.')
             return None
         outlet_num = None
-        on_off = None
+        on_off = acc_command[2]
         try:
             outlet_num = int(acc_command[1])
-            on_off = int(acc_command[2])
             if (outlet_num < 1) or (outlet_num > 8) or \
-                    (on_off < 0) or (on_off > 1):
+                    (on_off.upper() != 'ON' and on_off.upper() != 'OFF'):
                 self.logger('Invalid call to OUTLET.')
                 return None
         except ValueError:
@@ -121,7 +120,7 @@ class PDUWorker(i_worker.IWorker):
         # Given that the parameters are all correct, we return the
         # link string to be processed later.
         command = PDU_HOSTNAME + '/outlet?' + str(outlet_num) + '=' + \
-                  ON_OFF_MAP[on_off]
+                  on_off.upper()
         return command
 
     # region Method Description

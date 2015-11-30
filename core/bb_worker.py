@@ -26,13 +26,19 @@ QUERY_DICT = {0: 'DRAINVOLTAGE',
               3: 'GATEACURRENT',
               5: 'GATEBCURRENT'}
 
+# Amp-number Mapping
+AMP_MAP = {'hh': 0,
+           'lh': 1,
+           'lv': 2,
+           'hv': 3}
+
 class BBWorker(i_worker.IWorker):
     def __init__(self):
         super(BBWorker, self).__init__()
-        self.commands = ['LNAGATEA',
-                         'LNAGATEB',
-                         'LNADRAIN',
-                         'LNABIAS']
+        self.commands = ['LNA-GATE1',
+                         'LNA-GATE2',
+                         'LNA-DRAIN',
+                         'LNA-ENABLE']
         self.name = 'BB-Worker'
         self.bb_socket = None
         self.bb_ip = socket.gethostbyname(BB_HOSTNAME)
@@ -60,16 +66,16 @@ class BBWorker(i_worker.IWorker):
         if len(acc_command) != 3:
             self.logger('Invalid call to LNA-GATE1.')
             return None
-        amp_num = None
+        amp_num = acc_command[1]
         voltage = None
         try:
-            amp_num = int(acc_command[1])
+            amp_num = AMP_MAP.get(amp_num.lower(), -1)
             voltage = float(acc_command[2])
             voltage /= GATE_FACTOR
         except ValueError:
             self.logger('Invalid call to LNA-GATE1.')
             return None
-        if amp_num < 0 or amp_num > 3:
+        if amp_num == -1:
             self.logger('Invalid call to LNA-GATE1.')
             return None
 
@@ -97,16 +103,16 @@ class BBWorker(i_worker.IWorker):
         if len(acc_command) != 3:
             self.logger('Invalid call to LNA-GATE2.')
             return None
-        amp_num = None
+        amp_num = acc_command[1]
         voltage = None
         try:
-            amp_num = int(acc_command[1])
+            amp_num = AMP_MAP.get(amp_num.lower(), -1)
             voltage = float(acc_command[2])
             voltage /= GATE_FACTOR
         except ValueError:
             self.logger('Invalid call to LNA-GATE2.')
             return None
-        if amp_num < 0 or amp_num > 3:
+        if amp_num == -1:
             self.logger('Invalid call to LNA-GATE2.')
             return None
 
@@ -133,16 +139,16 @@ class BBWorker(i_worker.IWorker):
         if len(acc_command) != 3:
             self.logger('Invalid call to LNA-DRAIN.')
             return None
-        amp_num = None
+        amp_num = acc_command[1]
         voltage = None
         try:
-            amp_num = int(acc_command[1])
+            amp_num = AMP_MAP.get(amp_num.lower(), -1)
             voltage = float(acc_command[2])
             voltage /= DRAIN_FACTOR
         except ValueError:
             self.logger('Invalid call to LNA-DRAIN.')
             return None
-        if amp_num < 0 or amp_num > 3:
+        if amp_num == -1:
             self.logger('Invalid call to LNA-DRAIN.')
             return None
 
@@ -169,18 +175,22 @@ class BBWorker(i_worker.IWorker):
         if len(acc_command) != 3:
             self.logger('Invalid call to LNA-ENABLE.')
             return None
-        amp_num = None
-        state = None
+        amp_num = acc_command[1]
+        state = acc_command[2]
         try:
-            amp_num = int(acc_command[1])
-            state = int(acc_command[2])
+            amp_num = AMP_MAP.get(amp_num.lower(), -1)
         except ValueError:
             self.logger('Invalid call to LNA-ENABLE.')
             return None
-        if amp_num < 0 or amp_num > 3:
+        if amp_num == -1:
             self.logger('Invalid call to LNA-ENABLE.')
             return None
-        if state != 0 and state != 1:
+        if state.lower() == 'on':
+            state = 1
+        elif state.lower() == 'off':
+            state = 0
+        else:
+            self.logger('Invalid call to LNA-ENABLE.')
             return None
 
         # Given that the parameters are all reasonable, we return the
